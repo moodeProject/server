@@ -12,4 +12,13 @@ public class WorkerStatusResponse {
     private String deviceId;
     private WorkerState state;
     private LocalDateTime recordedAt;
+
+    private Double ax;
+    private Double ay;
+    private Double az;
+    private Double gx;
+    private Double gy;
+    private Double gz;
+
+    private Double confidence;
 }

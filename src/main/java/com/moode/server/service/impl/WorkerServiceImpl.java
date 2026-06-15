@@ -42,10 +42,19 @@ public class WorkerServiceImpl implements WorkerService {
     }
 
     private WorkerStatusResponse toResponse(SensorData data) {
-        return WorkerStatusResponse.builder()
-                .deviceId(data.getDeviceId())
-                .state(data.getState())
-                .recordedAt(data.getRecordedAt())
-                .build();
-    }
+    double confidence = data.getState() == WorkerState.FALLEN ? 1.0 : 0.0;
+
+    return WorkerStatusResponse.builder()
+            .deviceId(data.getDeviceId())
+            .state(data.getState())
+            .recordedAt(data.getRecordedAt())
+            .ax(data.getAx())
+            .ay(data.getAy())
+            .az(data.getAz())
+            .gx(data.getGx())
+            .gy(data.getGy())
+            .gz(data.getGz())
+            .confidence(confidence)
+            .build();
+}
 }
