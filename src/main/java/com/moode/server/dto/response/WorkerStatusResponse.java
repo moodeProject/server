@@ -10,7 +10,11 @@ import java.time.LocalDateTime;
 @Builder
 public class WorkerStatusResponse {
     private String deviceId;
-    private WorkerState state;
+
+    // 추락 / 건강, 서로 독립적인 판단 결과
+    private WorkerState fallState;
+    private WorkerState healthState;
+
     private LocalDateTime recordedAt;
 
     private Double ax;
@@ -20,5 +24,8 @@ public class WorkerStatusResponse {
     private Double gy;
     private Double gz;
 
-    private Double confidence;
+    private Double heartRate;
+    private Double spo2;
+
+    private Double fallConfidence;
 }

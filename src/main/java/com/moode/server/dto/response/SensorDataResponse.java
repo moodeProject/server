@@ -11,7 +11,15 @@ import java.time.LocalDateTime;
 public class SensorDataResponse {
     private Long id;
     private String deviceId;
-    private WorkerState state;
+
+    // 추락 / 건강, 서로 독립적인 판단 결과
+    private WorkerState fallState;
+    private WorkerState healthState;
+
+    private Double fallConfidence;
+
+    // 둘 중 하나라도 경고 등급 이상이면 true
     private boolean alertTriggered;
+
     private LocalDateTime recordedAt;
 }
