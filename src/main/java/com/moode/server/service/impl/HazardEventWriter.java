@@ -2,6 +2,7 @@ package com.moode.server.service.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.moode.server.common.Times;
 import com.moode.server.config.HazardSeverityPolicy;
 import com.moode.server.domain.*;
 import com.moode.server.dto.request.HazardClipRequest;
@@ -19,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -200,11 +200,11 @@ public class HazardEventWriter {
     }
 
     /**
-     * AI 서버는 오프셋이 붙은 시각(+00:00)을 보낸다. DB/기존 엔티티가 모두 서버 로컬시각 기준
-     * LocalDateTime 이라 시스템 타임존으로 변환해 저장한다. 변환 없이 잘라내면 9시간 어긋난다.
+     * AI 서버는 오프셋이 붙은 시각(+00:00)을 보낸다. 저장은 LocalDateTime 이라
+     * 서비스 기준 시간대로 환산해 넣는다. 변환 없이 잘라내면 9시간 어긋난다.
      */
     private LocalDateTime toLocalDateTime(java.time.OffsetDateTime occurredAt) {
-        return occurredAt.atZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
+        return Times.toLocal(occurredAt);
     }
 
     private StorageType parseStorageType(String raw) {

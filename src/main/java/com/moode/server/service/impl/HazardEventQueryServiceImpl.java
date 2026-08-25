@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -124,10 +123,7 @@ public class HazardEventQueryServiceImpl implements HazardEventQueryService {
     // ===================== 보조 =====================
 
     private LocalDateTime toLocal(OffsetDateTime value) {
-        if (value == null) {
-            return null;
-        }
-        return value.atZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
+        return Times.toLocal(value);
     }
 
     private Set<Long> findEventIdsWithClip(List<HazardEvent> events) {
