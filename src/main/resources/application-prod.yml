@@ -15,3 +15,14 @@ ai:
 
 server:
   port: 8080
+
+internal:
+  api:
+    # 기본값을 두지 않는다. 미주입 시 기동에 실패시켜 인증 없는 내부 API 가 열리는 걸 막는다.
+    key: ${INTERNAL_API_KEY}
+
+clip:
+  storage:
+    enabled: true
+    region: ${AWS_REGION:ap-northeast-2}
+    presign-ttl: 15m
