@@ -1,0 +1,635 @@
+{
+  "entityData": [
+    {
+      "_id": "g2g46Aa3R9Tw7jua3",
+      "_diagramId": "TZyPPsj9mS3zZ9fbj",
+      "pName": "hazard_event",
+      "name": "hazard_event",
+      "position": {
+        "x": 750,
+        "y": 1100
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "i64xZank4JoE9vxyP",
+            "name": "event_id",
+            "pName": "event_id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null
+          }
+        ],
+        "fks": []
+      },
+      "fields": [
+        {
+          "_id": "hzf0000000000001x",
+          "name": "event_uid",
+          "pName": "event_uid",
+          "domain": "",
+          "type": "CHAR(32)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "AI 서버가 만든 사건 식별자. UNIQUE 아님 - 한 사건에 여러 행 가능",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000002x",
+          "name": "helmet_id",
+          "pName": "helmet_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "수신 시점 배정 스냅샷",
+          "relEntity": "JgNQqsKXZTiCXanJH",
+          "relFieldId": "RAWp4G8p9rvRyyTAv",
+          "relType": "ZERO_OR_ONE_OR_MANY"
+        },
+        {
+          "_id": "hzf0000000000003x",
+          "name": "worker_id",
+          "pName": "worker_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "미배정 헬멧이면 NULL",
+          "relEntity": "8CBzgHcDgsnAzTg25",
+          "relFieldId": "Y7HLW4N5eokxWtTwb",
+          "relType": "ZERO_OR_ONE_OR_MANY"
+        },
+        {
+          "_id": "hzf0000000000004x",
+          "name": "zone_id",
+          "pName": "zone_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": "WB8yycRbHRjrzbfgi",
+          "relFieldId": "hG4XKyfre8TpqaF5q",
+          "relType": "ZERO_OR_ONE_OR_MANY"
+        },
+        {
+          "_id": "hzf0000000000005x",
+          "name": "event_category",
+          "pName": "event_category",
+          "domain": "",
+          "type": "ENUM('EXTERNAL','HEALTH','FALL')",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000006x",
+          "name": "hazard_type",
+          "pName": "hazard_type",
+          "domain": "",
+          "type": "VARCHAR(32)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "puddle / pothole / forklift",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000007x",
+          "name": "severity",
+          "pName": "severity",
+          "domain": "",
+          "type": "ENUM('WARNING','DANGER')",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "AI 가 아니라 서버가 hazard_type 으로 판정",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000008x",
+          "name": "confidence",
+          "pName": "confidence",
+          "domain": "",
+          "type": "DECIMAL(5,4)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "AI 신뢰도 원본. 0.8483 을 담으려면 소수 4자리 필요",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000009x",
+          "name": "source",
+          "pName": "source",
+          "domain": "",
+          "type": "ENUM('VISION_AI','IMU_HEALTH','MANUAL')",
+          "defaultValue": "'VISION_AI'",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000010x",
+          "name": "description",
+          "pName": "description",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "목록/상세 상황 설명. 비면 hazard_type 기본 문구 사용",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000011x",
+          "name": "location_detail",
+          "pName": "location_detail",
+          "domain": "",
+          "type": "VARCHAR(100)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000012x",
+          "name": "frame_width",
+          "pName": "frame_width",
+          "domain": "",
+          "type": "INT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "bbox 좌표의 기준 해상도. 없으면 오버레이 스케일 불가",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000013x",
+          "name": "frame_height",
+          "pName": "frame_height",
+          "domain": "",
+          "type": "INT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "bbox 좌표의 기준 해상도",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000014x",
+          "name": "detections_json",
+          "pName": "detections_json",
+          "domain": "",
+          "type": "TEXT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "bbox 배열 원본. 프론트 오버레이용",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000015x",
+          "name": "occurred_at",
+          "pName": "occurred_at",
+          "domain": "",
+          "type": "DATETIME(3)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "사건 발생 시각. 목록 정렬 기준",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000016x",
+          "name": "status",
+          "pName": "status",
+          "domain": "",
+          "type": "ENUM('UNHANDLED','IN_PROGRESS','RESOLVED')",
+          "defaultValue": "'UNHANDLED'",
+          "isAllowNull": false,
+          "comment": "프론트 명세 기준",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000017x",
+          "name": "handled_by",
+          "pName": "handled_by",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "조치한 관리자",
+          "relEntity": "5imYJt5mkmcgqPR6g",
+          "relFieldId": "gQAi8sSY2KBxypdWd",
+          "relType": "ZERO_OR_ONE_OR_MANY"
+        },
+        {
+          "_id": "hzf0000000000018x",
+          "name": "handled_at",
+          "pName": "handled_at",
+          "domain": "",
+          "type": "DATETIME(3)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000019x",
+          "name": "cause_primary",
+          "pName": "cause_primary",
+          "domain": "",
+          "type": "VARCHAR(100)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "원인 분석 담당 영역",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000020x",
+          "name": "cause_secondary",
+          "pName": "cause_secondary",
+          "domain": "",
+          "type": "VARCHAR(100)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "원인 분석 담당 영역",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000021x",
+          "name": "cause_contributing",
+          "pName": "cause_contributing",
+          "domain": "",
+          "type": "VARCHAR(200)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "원인 분석 담당 영역",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000022x",
+          "name": "cause_final_estimated",
+          "pName": "cause_final_estimated",
+          "domain": "",
+          "type": "VARCHAR(200)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "원인 분석 담당 영역",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000023x",
+          "name": "ai_report_text",
+          "pName": "ai_report_text",
+          "domain": "",
+          "type": "TEXT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "AI 리포트 담당 영역",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000024x",
+          "name": "created_at",
+          "pName": "created_at",
+          "domain": "",
+          "type": "DATETIME",
+          "defaultValue": "CURRENT_TIMESTAMP",
+          "isAllowNull": false,
+          "comment": "수신 기록 생성 시각",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        }
+      ],
+      "color": "rgba(10, 10, 10, 0.5)"
+    },
+    {
+      "_id": "hzcLipEnt00000001",
+      "_diagramId": "TZyPPsj9mS3zZ9fbj",
+      "pName": "hazard_clip",
+      "name": "hazard_clip",
+      "position": {
+        "x": 300,
+        "y": 1560
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "hzcLipPk000000001",
+            "name": "clip_id",
+            "pName": "clip_id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null
+          }
+        ],
+        "fks": []
+      },
+      "fields": [
+        {
+          "_id": "hzf0000000000025x",
+          "name": "hazard_event_id",
+          "pName": "hazard_event_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "UNIQUE. 이벤트당 최대 1건(1:0..1)",
+          "relEntity": "g2g46Aa3R9Tw7jua3",
+          "relFieldId": "i64xZank4JoE9vxyP",
+          "relType": "ZERO_OR_ONE_OR_MANY"
+        },
+        {
+          "_id": "hzf0000000000026x",
+          "name": "storage_type",
+          "pName": "storage_type",
+          "domain": "",
+          "type": "ENUM('S3','LOCAL')",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000027x",
+          "name": "bucket",
+          "pName": "bucket",
+          "domain": "",
+          "type": "VARCHAR(64)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "LOCAL 이면 NULL",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000028x",
+          "name": "object_key",
+          "pName": "object_key",
+          "domain": "",
+          "type": "VARCHAR(512)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "공개 URL 이 아니라 객체 키. 조회 시 pre-signed URL 발급",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000029x",
+          "name": "duration_seconds",
+          "pName": "duration_seconds",
+          "domain": "",
+          "type": "DECIMAL(6,2)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000030x",
+          "name": "frame_count",
+          "pName": "frame_count",
+          "domain": "",
+          "type": "INT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000031x",
+          "name": "marked_offset_seconds",
+          "pName": "marked_offset_seconds",
+          "domain": "",
+          "type": "DECIMAL(6,2)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "재생바의 감지 시점 마커 위치",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        }
+      ],
+      "color": "rgba(10, 10, 10, 0.5)"
+    },
+    {
+      "_id": "hzInboundEnt00001",
+      "_diagramId": "TZyPPsj9mS3zZ9fbj",
+      "pName": "inbound_message",
+      "name": "inbound_message",
+      "position": {
+        "x": 750,
+        "y": 1560
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "hzInboundPk000001",
+            "name": "idempotency_key",
+            "pName": "idempotency_key",
+            "domain": "",
+            "type": "CHAR(32)",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "메시지 단위 식별자. 중복 판정은 오직 이 값으로만",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null
+          }
+        ],
+        "fks": []
+      },
+      "fields": [
+        {
+          "_id": "hzf0000000000032x",
+          "name": "event_uid",
+          "pName": "event_uid",
+          "domain": "",
+          "type": "CHAR(32)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "INDEX. 한 사건의 여러 메시지를 묶어보기 위함",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000033x",
+          "name": "event_type",
+          "pName": "event_type",
+          "domain": "",
+          "type": "VARCHAR(24)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "HAZARD_CONFIRMED / CLIP_READY",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000034x",
+          "name": "received_at",
+          "pName": "received_at",
+          "domain": "",
+          "type": "DATETIME(3)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        }
+      ],
+      "color": "rgba(10, 10, 10, 0.5)"
+    },
+    {
+      "_id": "hzActionEnt000001",
+      "_diagramId": "TZyPPsj9mS3zZ9fbj",
+      "pName": "hazard_event_action",
+      "name": "hazard_event_action",
+      "position": {
+        "x": 1150,
+        "y": 1560
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "hzActionPk0000001",
+            "name": "action_id",
+            "pName": "action_id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null
+          }
+        ],
+        "fks": []
+      },
+      "fields": [
+        {
+          "_id": "hzf0000000000035x",
+          "name": "hazard_event_id",
+          "pName": "hazard_event_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "g2g46Aa3R9Tw7jua3",
+          "relFieldId": "i64xZank4JoE9vxyP",
+          "relType": "ZERO_OR_ONE_OR_MANY"
+        },
+        {
+          "_id": "hzf0000000000036x",
+          "name": "action_type",
+          "pName": "action_type",
+          "domain": "",
+          "type": "VARCHAR(20)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "SEND_WARNING / BLOCK_ZONE / RESOLVE",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000037x",
+          "name": "performed_by",
+          "pName": "performed_by",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": "5imYJt5mkmcgqPR6g",
+          "relFieldId": "gQAi8sSY2KBxypdWd",
+          "relType": "ZERO_OR_ONE_OR_MANY"
+        },
+        {
+          "_id": "hzf0000000000038x",
+          "name": "performed_at",
+          "pName": "performed_at",
+          "domain": "",
+          "type": "DATETIME",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hzf0000000000039x",
+          "name": "notified_count",
+          "pName": "notified_count",
+          "domain": "",
+          "type": "INT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        }
+      ],
+      "color": "rgba(10, 10, 10, 0.5)"
+    }
+  ]
+}

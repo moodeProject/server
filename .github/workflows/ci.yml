@@ -30,6 +30,14 @@ jobs:
       - name: Gradle 권한 설정
         run: chmod +x gradlew
 
-      - name: 빌드 테스트
-        run: ./gradlew build -x test
-        # -x test : 테스트 코드 없어도 빌드 통과하게
+      - name: 빌드 및 테스트
+        run: ./gradlew build
+        # 테스트는 H2(인메모리)로 돌아서 CI 에 별도 DB 가 필요 없다.
+
+      - name: 테스트 리포트 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: build/reports/tests/test
+          retention-days: 7

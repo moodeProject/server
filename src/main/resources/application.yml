@@ -9,6 +9,9 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        # 목록 조회에서 worker/zone/helmet 을 항목마다 따로 읽지 않고 IN 쿼리로 묶는다.
+        # 없으면 페이지 크기만큼 N+1 이 난다.
+        default_batch_fetch_size: 100
 
 server:
   port: 8080
@@ -16,3 +19,27 @@ server:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+
+# 위험 등급 판정 규칙 (회사 안전규정). AI 서버는 hazardType 원본만 보내고 등급은 서버가 결정한다.
+# 규정이 바뀌면 이 값만 고치면 되고, 누락된 종류는 HazardType 의 기본값으로 fallback 한다.
+hazard:
+  severity:
+    puddle: WARNING
+    pothole: WARNING
+    forklift: DANGER
+
+  # SSE 실시간 스트림
+  stream:
+    # 0 = 무제한. 짧게 잡으면 대시보드 연결이 계속 끊겼다 붙는다.
+    timeout-millis: 0
+    # 중간 프록시가 유휴 연결을 끊지 않도록 보내는 주기
+    heartbeat-millis: 30000
+
+# 증거 클립 저장소. 재생 URL 은 저장하지 않고 조회 시점에 발급한다.
+clip:
+  storage:
+    # S3Presigner 빈 생성 여부. 자격증명이 없는 환경에서 기동이 깨지지 않도록 기본은 꺼둔다.
+    enabled: false
+    region: ap-northeast-2
+    presign-ttl: 15m
+    local-base-url: ""
