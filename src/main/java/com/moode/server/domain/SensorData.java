@@ -43,6 +43,9 @@ public class SensorData {
     // 추락 판단에 대한 AI 신뢰도. AI 호출 실패 시 null.
     private Double fallConfidence;
 
+    // 센서가 보낸 자세 상태 원본. STABLE / STUMBLE / COLLAPSE
+    private String posture;
+
     private LocalDateTime recordedAt;
 
     @PrePersist

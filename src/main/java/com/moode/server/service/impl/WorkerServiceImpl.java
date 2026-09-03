@@ -60,6 +60,12 @@ public class WorkerServiceImpl implements WorkerService {
                 .heartRate(data.getHeartRate())
                 .spo2(data.getSpo2())
                 .fallConfidence(data.getFallConfidence())
+                .posture(data.getPosture())
+                .postureAbnormal(isPostureAbnormal(data.getPosture()))
                 .build();
+    }
+
+    private boolean isPostureAbnormal(String posture) {
+        return "STUMBLE".equalsIgnoreCase(posture) || "COLLAPSE".equalsIgnoreCase(posture);
     }
 }

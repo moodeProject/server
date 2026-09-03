@@ -53,6 +53,7 @@ public class SensorDataServiceImpl implements SensorDataService {
                         .fallState(fallResult.state())
                         .fallConfidence(fallResult.confidence())
                         .healthState(healthState)
+                        .posture(request.getPosture())
                         .build()
         );
 

@@ -28,4 +28,8 @@ public class WorkerStatusResponse {
     private Double spo2;
 
     private Double fallConfidence;
+
+    // 자세 이상 (근로자 모바일 움직임 상태 / 관리자 추락 상세의 "자세 변화 감지됨" 용)
+    private String posture;            // STABLE / STUMBLE / COLLAPSE
+    private Boolean postureAbnormal;   // STUMBLE·COLLAPSE 이면 true
 }
