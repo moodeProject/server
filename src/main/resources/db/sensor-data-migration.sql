@@ -17,3 +17,8 @@ ALTER TABLE sensor_data
     ADD COLUMN fall_state      VARCHAR(255) NULL COMMENT '기존 state 를 추락/건강으로 분리한 것',
     ADD COLUMN health_state    VARCHAR(255) NULL,
     ADD COLUMN fall_confidence DOUBLE       NULL COMMENT '추락 판단 AI 신뢰도. 호출 실패 시 NULL';
+
+-- 자세 상태(posture) 컬럼 추가 (근로자 자세 이상 조회 API 연동분)
+-- 위와 마찬가지로 ddl-auto=validate 라 배포 전 반영 필수. 재실행 시 "Duplicate column name" 나면 이미 반영된 것.
+ALTER TABLE sensor_data
+    ADD COLUMN posture VARCHAR(255) NULL COMMENT '센서가 보낸 자세 상태 원본 STABLE/STUMBLE/COLLAPSE';
