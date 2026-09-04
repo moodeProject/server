@@ -1,5 +1,6 @@
 package com.moode.server.dto.request;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -20,7 +21,10 @@ public class SensorDataRequest {
     private Double heartRate;
     private Double spo2;
 
-    private String posture;          // STABLE / STUMBLE / COLLAPSE
+    @Schema(description = "펌웨어 자세 판정 결과",
+            example = "STABLE",
+            allowableValues = {"STABLE", "STUMBLE", "COLLAPSE"})
+    private String posture;
     private Boolean healthAbnormal;  // checkHealthAbnormal() 결과
     private String level;            // NORMAL / RECOMMEND / ACTION_REQUIRED
 }
