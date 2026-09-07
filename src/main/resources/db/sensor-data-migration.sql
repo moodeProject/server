@@ -46,3 +46,22 @@ ALTER TABLE sensor_data
 INSERT IGNORE INTO `zone` (zone_code, zone_name, floor, risk_level, access_restricted)
 VALUES ('ZONE-01', '구역 1 (임시명)', NULL, 'LOW', FALSE),
        ('ZONE-02', '구역 2 (임시명)', NULL, 'LOW', FALSE);
+
+-- worker / helmet 시드 (센서 추락 -> hazard_event 연동분)
+--
+-- hazard_event.helmet_id 가 NOT NULL 이라, 헬멧이 helmet 테이블에 등록되어 있지 않으면
+-- 추락을 정상 판정하고도 이벤트를 만들지 못한다(대시보드에 계속 빈 목록으로 보인다).
+-- 그런데 헬멧 등록/배정 API 가 아직 없고, 관리자 화면의 헬멧 관리는 localStorage 에만
+-- 저장하고 있어 서버 DB 에는 아무 행도 생기지 않는다. 그래서 여기서 심는다.
+--
+-- device_id 는 펌웨어 postureAlert.ino 의 deviceId 상수와 반드시 같아야 한다.
+-- 헬멧을 늘리거나 실제 작업자 정보가 정해지면 이 행을 UPDATE 하거나 같은 형태로 추가한다.
+-- password_hash 는 로그인 기능이 붙기 전까지의 자리표시자다. 실제 인증에 쓰지 말 것.
+INSERT IGNORE INTO worker (employee_no, password_hash, name, department, status, current_zone_id)
+VALUES ('WK-0001', 'PLACEHOLDER_NOT_A_REAL_HASH', '테스트 작업자', '공무팀', 'WORKING',
+        (SELECT zone_id FROM `zone` WHERE zone_code = 'ZONE-01'));
+
+INSERT IGNORE INTO helmet (helmet_no, device_id, worker_id, sensor_status, operational_status)
+VALUES ('H-001', 'HELMET-001',
+        (SELECT worker_id FROM worker WHERE employee_no = 'WK-0001'),
+        'DISCONNECTED', 'IN_USE');
