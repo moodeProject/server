@@ -31,4 +31,10 @@ public class SensorDataRequest {
     private Double hrv;               // RMSSD(ms). 계산 불가 시 음수/누락
     private Boolean fatigueAbnormal;  // 개인 HRV 기준선 대비 이탈 여부
     private Boolean heatRiskAbnormal; // 활동량 대비 심박 지속 상승 여부 (외부 기상 정보 미반영 상태의 1차 지표)
+    @Schema(description = "헬멧이 BLE 비콘 스캔으로 추정한 현재 구역. "
+            + "zone 테이블의 zone_code로 조회되어 Worker.currentZone에 반영됨 "
+            + "(매핑되는 zone_code가 없으면 조용히 무시됨).",
+            example = "ZONE-01",
+            nullable = true)
+    private String zoneId;
 }

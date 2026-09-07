@@ -84,4 +84,19 @@ public class Worker {
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
+
+    /**
+     * 헬멧이 보낸 BLE 비콘 스캔 결과로 현재 구역/근접 비콘을 갱신한다.
+     * 좌표(posX/posY)는 이 경로에서 다루지 않는다 — 삼변측량 등 다른 위치추정이 생기면 별도로 채운다.
+     *
+     * @param zone            새로 판정된 구역. 알 수 없으면(구역 못 잡음) null.
+     * @param nearestBeaconId 가장 신호가 센 비콘 식별자. 알 수 없으면 null.
+     * @param rssi            그 비콘의 RSSI. 알 수 없으면 null.
+     */
+    public void updateBeaconLocation(Zone zone, String nearestBeaconId, Short rssi) {
+        this.currentZone = zone;
+        this.nearestBeaconId = nearestBeaconId;
+        this.rssi = rssi;
+        this.positionUpdatedAt = LocalDateTime.now();
+    }
 }

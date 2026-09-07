@@ -50,6 +50,10 @@ public class SensorData {
     // 센서가 보낸 자세 상태 원본. STABLE / STUMBLE / COLLAPSE
     private String posture;
 
+    // 헬멧이 BLE 비콘 스캔으로 추정한 구역 (예: "ZONE-01"). zone 테이블과는 아직
+    // FK로 연결되어 있지 않음 — 원본 문자열만 기록. 정식 연결은 별도 작업 필요.
+    private String zoneId;
+
     private LocalDateTime recordedAt;
 
     @PrePersist
