@@ -29,6 +29,15 @@ ALTER TABLE sensor_data
 ALTER TABLE sensor_data
     ADD COLUMN zone_id VARCHAR(255) NULL COMMENT '헬멧이 BLE 비콘 스캔으로 추정한 구역 (예: ZONE-01)';
 
+-- HRV / 피로 / 온열질환 컬럼 추가 (외부 기상 API 연동 온열질환 판정분, PR #14)
+-- SensorData 엔티티에는 이미 필드가 있는데 이 ALTER 가 빠져 있었다. ddl-auto=validate 인
+-- 운영에서는 엔티티에 있는 컬럼이 DB에 없으면 스키마 검증에 걸려 앱이 기동되지 않는다.
+-- 재실행 시 "Duplicate column name" 나면 이미 반영된 것.
+ALTER TABLE sensor_data
+    ADD COLUMN hrv                DOUBLE NULL COMMENT '심박변이도 RMSSD(ms). 계산 불가 시 NULL',
+    ADD COLUMN fatigue_abnormal   BIT(1) NULL COMMENT '개인 HRV 기준선 대비 이탈 여부',
+    ADD COLUMN heat_risk_abnormal BIT(1) NULL COMMENT '활동량 대비 심박 지속 상승 여부(기상정보 미반영 1차 지표)';
+
 -- zone_code 시드 (헬멧 BLE 비콘 구역 판정 연동분)
 -- SensorDataServiceImpl 이 이 zone_code로 zone 테이블을 조회해서 Worker.currentZone을 갱신한다.
 -- 실제 zone_code가 이미 등록되어 있는지 API로 확인할 방법이 없어서, 있으면 무시되고
