@@ -9,6 +9,12 @@
 --
 -- MySQL 8.0 이상에서 IF NOT EXISTS 를 지원하지 않으므로, 이미 적용된 환경에서 재실행하면
 -- "Duplicate column name" 오류가 난다. 그 경우 이미 반영된 것이니 무시해도 된다.
+--
+-- ⚠ Windows 의 mysql.exe 로 실행할 때는 반드시 --default-character-set=utf8mb4 를 준다.
+--    안 주면 클라이언트 기본 charset(cp949)으로 해석되어 아래 시드의 한글이 깨진 채
+--    저장된다. 컬럼이 utf8mb4 여도 INSERT 시점에 이미 망가지므로 나중에 못 되돌린다.
+--    (MySQL 8.4.9 에서 실제로 재현 확인함)
+--      mysql -u root -p --default-character-set=utf8mb4 safehelmet < sensor-data-migration.sql
 
 ALTER TABLE sensor_data
     ADD COLUMN heart_rate      DOUBLE       NULL COMMENT 'MAX30102 심박수',
