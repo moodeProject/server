@@ -65,4 +65,10 @@ public class Helmet {
             this.registeredAt = LocalDateTime.now();
         }
     }
+
+    /** 센서 데이터를 실제로 수신했을 때 통신 상태를 갱신한다. operationalStatus(관리자 배정 상태)는 건드리지 않는다. */
+    public void recordCommunication() {
+        this.sensorStatus = SensorStatus.CONNECTED;
+        this.lastCommunicationAt = LocalDateTime.now();
+    }
 }

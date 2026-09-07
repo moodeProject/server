@@ -22,3 +22,18 @@ ALTER TABLE sensor_data
 -- 위와 마찬가지로 ddl-auto=validate 라 배포 전 반영 필수. 재실행 시 "Duplicate column name" 나면 이미 반영된 것.
 ALTER TABLE sensor_data
     ADD COLUMN posture VARCHAR(255) NULL COMMENT '센서가 보낸 자세 상태 원본 STABLE/STUMBLE/COLLAPSE';
+
+-- 구역(zoneId) 컬럼 추가 (헬멧 BLE 비콘 구역 판정 연동분)
+-- 헬멧이 보낸 구역 추정값 원본 문자열을 그대로 저장한다.
+-- 위와 마찬가지로 ddl-auto=validate 라 배포 전 반영 필수. 재실행 시 "Duplicate column name" 나면 이미 반영된 것.
+ALTER TABLE sensor_data
+    ADD COLUMN zone_id VARCHAR(255) NULL COMMENT '헬멧이 BLE 비콘 스캔으로 추정한 구역 (예: ZONE-01)';
+
+-- zone_code 시드 (헬멧 BLE 비콘 구역 판정 연동분)
+-- SensorDataServiceImpl 이 이 zone_code로 zone 테이블을 조회해서 Worker.currentZone을 갱신한다.
+-- 실제 zone_code가 이미 등록되어 있는지 API로 확인할 방법이 없어서, 있으면 무시되고
+-- 없으면 생성되도록 INSERT IGNORE로 넣는다. zone_name/floor는 임시값이니 실제 현장 명칭이
+-- 정해지면 UPDATE로 바꿔도 된다 (zone_code 자체를 바꾸는 게 아니라서 안전함).
+INSERT IGNORE INTO `zone` (zone_code, zone_name, floor, risk_level, access_restricted)
+VALUES ('ZONE-01', '구역 1 (임시명)', NULL, 'LOW', FALSE),
+       ('ZONE-02', '구역 2 (임시명)', NULL, 'LOW', FALSE);

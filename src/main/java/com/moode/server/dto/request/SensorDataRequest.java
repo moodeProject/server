@@ -27,4 +27,11 @@ public class SensorDataRequest {
     private String posture;
     private Boolean healthAbnormal;  // checkHealthAbnormal() 결과
     private String level;            // NORMAL / RECOMMEND / ACTION_REQUIRED
+
+    @Schema(description = "헬멧이 BLE 비콘 스캔으로 추정한 현재 구역. "
+            + "zone 테이블의 zone_code로 조회되어 Worker.currentZone에 반영됨 "
+            + "(매핑되는 zone_code가 없으면 조용히 무시됨).",
+            example = "ZONE-01",
+            nullable = true)
+    private String zoneId;
 }

@@ -1,17 +1,23 @@
 package com.moode.server.service.impl;
 
+import com.moode.server.domain.Helmet;
 import com.moode.server.domain.SensorData;
+import com.moode.server.domain.Worker;
 import com.moode.server.domain.WorkerState;
+import com.moode.server.domain.Zone;
 import com.moode.server.dto.request.SensorDataRequest;
 import com.moode.server.dto.response.SensorDataResponse;
 import com.moode.server.infrastructure.client.AiServerClient;
 import com.moode.server.infrastructure.dto.request.AiRequest;
 import com.moode.server.infrastructure.dto.response.AiResponse;
+import com.moode.server.repository.HelmetRepository;
 import com.moode.server.repository.SensorDataRepository;
+import com.moode.server.repository.ZoneRepository;
 import com.moode.server.service.SensorDataService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -20,11 +26,14 @@ public class SensorDataServiceImpl implements SensorDataService {
 
     private final SensorDataRepository sensorDataRepository;
     private final AiServerClient aiServerClient;
+    private final HelmetRepository helmetRepository;
+    private final ZoneRepository zoneRepository;
 
     private static final double ACC_LIMIT = 50.0;    // 가속도 허용 범위
     private static final double GYRO_LIMIT = 2000.0; // 각속도 허용 범위
 
     @Override
+    @Transactional
     public SensorDataResponse processSensorData(SensorDataRequest request) {
 
         // 1. 데이터 유효성 검사 (원본 값 자체가 이상하면 여기서 막음)
@@ -54,6 +63,7 @@ public class SensorDataServiceImpl implements SensorDataService {
                         .fallConfidence(fallResult.confidence())
                         .healthState(healthState)
                         .posture(request.getPosture())
+                        .zoneId(request.getZoneId())
                         .build()
         );
 
@@ -64,6 +74,9 @@ public class SensorDataServiceImpl implements SensorDataService {
         if (fallAlert) triggerAlert(request.getDeviceId(), "FALL", fallResult.state());
         if (healthAlert) triggerAlert(request.getDeviceId(), "HEALTH", healthState);
 
+        // 6. 헬멧/작업자 위치(비콘 구역) 갱신 — 등록 안 된 deviceId거나 미배정 헬멧이면 조용히 스킵
+        updateWorkerLocation(request);
+
         return SensorDataResponse.builder()
                 .id(saved.getId())
                 .deviceId(saved.getDeviceId())
@@ -71,6 +84,7 @@ public class SensorDataServiceImpl implements SensorDataService {
                 .healthState(healthState)
                 .fallConfidence(fallResult.confidence())
                 .alertTriggered(fallAlert || healthAlert)
+                .zoneId(saved.getZoneId())
                 .recordedAt(saved.getRecordedAt())
                 .build();
     }
@@ -152,6 +166,42 @@ public class SensorDataServiceImpl implements SensorDataService {
             return WorkerState.NORMAL;
         }
         return parsed;
+    }
+
+    // ===================== 3. 위치 (헬멧 비콘 구역, 독립) =====================
+
+    /**
+     * deviceId로 헬멧을 찾아 통신 상태를 갱신하고, 배정된 작업자가 있으면 zoneId(구역 코드)로
+     * Zone을 조회해 Worker.currentZone까지 갱신한다.
+     * 등록 안 된 deviceId, 미배정 헬멧, 매핑 안 되는 zoneId는 전부 에러 없이 조용히 넘어간다 —
+     * 위치 갱신은 부가 기능이라 이것 때문에 센서 데이터 저장/판단 자체가 실패하면 안 된다.
+     */
+    private void updateWorkerLocation(SensorDataRequest request) {
+        Helmet helmet = helmetRepository.findByDeviceId(request.getDeviceId()).orElse(null);
+        if (helmet == null) {
+            log.debug("등록되지 않은 deviceId라 위치 갱신 스킵: {}", request.getDeviceId());
+            return;
+        }
+        helmet.recordCommunication();
+
+        Worker worker = helmet.getWorker();
+        if (worker == null) {
+            log.debug("작업자가 배정되지 않은 헬멧이라 위치 갱신 스킵: deviceId={}", request.getDeviceId());
+            return;
+        }
+
+        String zoneId = request.getZoneId();
+        if (zoneId == null || zoneId.isBlank()) {
+            return; // 이번 전송엔 구역 정보가 없음 — 기존 값 유지, 건드리지 않음
+        }
+
+        Zone zone = zoneRepository.findByZoneCode(zoneId).orElse(null);
+        if (zone == null) {
+            log.warn("zone 테이블에 없는 zoneId 수신: {} (deviceId={})", zoneId, request.getDeviceId());
+        }
+        // nearestBeaconId/rssi는 펌웨어가 아직 원시 비콘 식별자를 안 보내고 있어서(구역 이름만 보냄)
+        // 지금은 채우지 않는다 — 필요해지면 페이로드에 major/rssi를 추가하고 여기도 같이 채운다.
+        worker.updateBeaconLocation(zone, null, null);
     }
 
     // ===================== 공통 =====================
