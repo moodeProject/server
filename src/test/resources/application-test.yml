@@ -32,3 +32,11 @@ clip:
   storage:
     enabled: false
     local-base-url: http://localhost:8080/clips
+
+weather:
+  api:
+    url: http://localhost:9999
+    service-key: test-key
+  site:
+    nx: 60
+    ny: 127
