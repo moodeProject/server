@@ -7,8 +7,10 @@ import lombok.RequiredArgsConstructor;
 import java.util.Arrays;
 
 /**
- * 영상에서 감지되는 외부 위험요소 종류.
+ * 감지되는 위험요소 종류. 감지 경로가 둘이다.
+ * PUDDLE/POTHOLE/FORKLIFT 는 영상(AI 서버)에서, STUMBLE/FALL 은 헬멧 IMU 에서 온다.
  * AI 서버는 소문자 원본값(puddle / pothole / forklift)만 보내고 등급 판정은 하지 않는다.
+ * ({@link #from} 은 AI 서버 수신 전용이라 IMU 쪽 값은 서버가 직접 지정한다)
  *
  * <p>화면에 그대로 쓸 한글 문구도 여기서 함께 관리한다. 프론트가 enum -> 한글 매핑 테이블을
  * 따로 들고 있지 않아도 되고, 문구가 바뀌어도 프론트 배포 없이 반영된다.
@@ -31,7 +33,17 @@ public enum HazardType {
 
     FORKLIFT(HazardSeverity.DANGER, "지게차 접근", "충돌 및 협착",
             "작업 통로에 지게차 접근 감지. 충돌 위험.",
-            "작업자에게 즉시 경고하고 구역 접근 통제가 필요합니다.");
+            "작업자에게 즉시 경고하고 구역 접근 통제가 필요합니다."),
+
+    // 아래 둘은 영상이 아니라 헬멧 IMU 에서 온다. category=FALL, source=IMU_HEALTH 로 저장되고
+    // 감지 주체만 다를 뿐 목록/상세/조치는 영상 이벤트와 완전히 같은 경로를 탄다.
+    STUMBLE(HazardSeverity.WARNING, "휘청거림", "균형 상실 및 추락 위험",
+            "헬멧 센서에서 휘청거림 감지. 균형 상실로 인한 추락 위험.",
+            "작업자 상태를 확인하고 휴식을 권고하세요."),
+
+    FALL(HazardSeverity.DANGER, "추락/쓰러짐", "추락 및 의식 소실",
+            "헬멧 센서에서 추락 또는 자세 붕괴 감지.",
+            "작업자 상태를 즉시 확인하고 필요 시 구조를 요청하세요.");
 
     private final HazardSeverity defaultSeverity;
 

@@ -1,5 +1,11 @@
 package com.moode.server.service.impl;
 
+import com.moode.server.config.HazardSeverityPolicy;
+import com.moode.server.domain.HazardCategory;
+import com.moode.server.domain.HazardEvent;
+import com.moode.server.domain.HazardSource;
+import com.moode.server.domain.HazardStatus;
+import com.moode.server.domain.HazardType;
 import com.moode.server.domain.Helmet;
 import com.moode.server.domain.SensorData;
 import com.moode.server.domain.Worker;
@@ -10,14 +16,21 @@ import com.moode.server.dto.response.SensorDataResponse;
 import com.moode.server.infrastructure.client.AiServerClient;
 import com.moode.server.infrastructure.dto.request.AiRequest;
 import com.moode.server.infrastructure.dto.response.AiResponse;
+import com.moode.server.repository.HazardEventRepository;
 import com.moode.server.repository.HelmetRepository;
 import com.moode.server.repository.SensorDataRepository;
 import com.moode.server.repository.ZoneRepository;
+import com.moode.server.service.HazardEventStreamService;
 import com.moode.server.service.SensorDataService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -29,6 +42,9 @@ public class SensorDataServiceImpl implements SensorDataService {
     private final WeatherHeatRiskCache weatherHeatRiskCache;
     private final HelmetRepository helmetRepository;
     private final ZoneRepository zoneRepository;
+    private final HazardEventRepository hazardEventRepository;
+    private final HazardSeverityPolicy hazardSeverityPolicy;
+    private final HazardEventStreamService hazardEventStreamService;
 
     private static final double ACC_LIMIT = 50.0;    // 가속도 허용 범위
     private static final double GYRO_LIMIT = 2000.0; // 각속도 허용 범위
@@ -42,17 +58,24 @@ public class SensorDataServiceImpl implements SensorDataService {
             throw new IllegalArgumentException("센서 데이터가 유효 범위를 벗어났습니다.");
         }
 
-        // 2. 독립 판단 1: 추락 (MPU6050 가속도/자이로 + AI + posture)
+        // 2. 직전 추락 상태 — 반드시 이번 건을 저장하기 "전에" 읽어야 비교 대상이 된다.
+        //    (저장 후에 읽으면 방금 넣은 행이 잡혀서 항상 "변화 없음"이 된다)
+        WorkerState previousFallState = sensorDataRepository
+                .findTop1ByDeviceIdOrderByIdDesc(request.getDeviceId())
+                .map(SensorData::getFallState)
+                .orElse(null);
+
+        // 3. 독립 판단 1: 추락 (MPU6050 가속도/자이로 + AI + posture)
         FallCheckResult fallResult = checkFall(request);
 
-        // 3. 독립 판단 2: 건강 (MAX30102 heartRate/spo2 + healthAbnormal + level + 외부 기상)
+        // 4. 독립 판단 2: 건강 (MAX30102 heartRate/spo2 + healthAbnormal + level + 외부 기상)
         WorkerState healthState = checkHealth(request);
 
         log.info("판단 결과: deviceId={}, fall={}({}), health={}, hrv={}, fatigue={}, heatRisk={}",
                 request.getDeviceId(), fallResult.state(), fallResult.confidence(), healthState,
                 request.getHrv(), request.getFatigueAbnormal(), request.getHeatRiskAbnormal());
 
-        // 4. DB 저장
+        // 5. DB 저장
         SensorData saved = sensorDataRepository.save(
                 SensorData.builder()
                         .deviceId(request.getDeviceId())
@@ -72,15 +95,21 @@ public class SensorDataServiceImpl implements SensorDataService {
                         .build()
         );
 
-        // 5. 도메인별로 각자 알림 여부 판단 + 각자 알림 발생 (섞지 않음)
+        // 6. 도메인별로 각자 알림 여부 판단 + 각자 알림 발생 (섞지 않음)
         boolean fallAlert = isAlertState(fallResult.state());
         boolean healthAlert = isAlertState(healthState);
 
         if (fallAlert) triggerAlert(request.getDeviceId(), "FALL", fallResult.state());
         if (healthAlert) triggerAlert(request.getDeviceId(), "HEALTH", healthState);
 
-        // 6. 헬멧/작업자 위치(비콘 구역) 갱신 — 등록 안 된 deviceId거나 미배정 헬멧이면 조용히 스킵
-        updateWorkerLocation(request);
+        // 7. 헬멧/작업자 위치(비콘 구역) 갱신 — 등록 안 된 deviceId거나 미배정 헬멧이면 조용히 스킵
+        //    위험 이벤트보다 먼저 실행해야 이번에 판정된 구역이 이벤트에 박제된다.
+        Helmet helmet = updateWorkerLocation(request);
+
+        // 8. 추락 위험 이벤트 기록 — 관리자 대시보드(/api/v1/hazard-events)로 올린다.
+        if (fallAlert) {
+            raiseFallHazardEvent(helmet, previousFallState, fallResult);
+        }
 
         return SensorDataResponse.builder()
                 .id(saved.getId())
@@ -197,24 +226,26 @@ public class SensorDataServiceImpl implements SensorDataService {
      * Zone을 조회해 Worker.currentZone까지 갱신한다.
      * 등록 안 된 deviceId, 미배정 헬멧, 매핑 안 되는 zoneId는 전부 에러 없이 조용히 넘어간다 —
      * 위치 갱신은 부가 기능이라 이것 때문에 센서 데이터 저장/판단 자체가 실패하면 안 된다.
+     *
+     * @return 조회된 헬멧. 등록되지 않은 deviceId면 null. 위험 이벤트를 붙일 대상으로 재사용한다.
      */
-    private void updateWorkerLocation(SensorDataRequest request) {
+    private Helmet updateWorkerLocation(SensorDataRequest request) {
         Helmet helmet = helmetRepository.findByDeviceId(request.getDeviceId()).orElse(null);
         if (helmet == null) {
             log.debug("등록되지 않은 deviceId라 위치 갱신 스킵: {}", request.getDeviceId());
-            return;
+            return null;
         }
         helmet.recordCommunication();
 
         Worker worker = helmet.getWorker();
         if (worker == null) {
             log.debug("작업자가 배정되지 않은 헬멧이라 위치 갱신 스킵: deviceId={}", request.getDeviceId());
-            return;
+            return helmet;
         }
 
         String zoneId = request.getZoneId();
         if (zoneId == null || zoneId.isBlank()) {
-            return; // 이번 전송엔 구역 정보가 없음 — 기존 값 유지, 건드리지 않음
+            return helmet; // 이번 전송엔 구역 정보가 없음 — 기존 값 유지, 건드리지 않음
         }
 
         Zone zone = zoneRepository.findByZoneCode(zoneId).orElse(null);
@@ -224,6 +255,86 @@ public class SensorDataServiceImpl implements SensorDataService {
         // nearestBeaconId/rssi는 펌웨어가 아직 원시 비콘 식별자를 안 보내고 있어서(구역 이름만 보냄)
         // 지금은 채우지 않는다 — 필요해지면 페이로드에 major/rssi를 추가하고 여기도 같이 채운다.
         worker.updateBeaconLocation(zone, null, null);
+        return helmet;
+    }
+
+    // ===================== 4. 추락 위험 이벤트 (독립) =====================
+
+    /**
+     * 추락/휘청거림을 hazard_event 로 올려 관리자 대시보드 목록(/api/v1/hazard-events)에 노출한다.
+     * 영상 감지 경로와 같은 테이블을 쓰고 source 로만 구분되므로, 목록/상세/조치 API 는 그대로 재사용된다.
+     *
+     * <p>펌웨어가 50Hz 로 보내는 데다 posture 는 3초 윈도우 결과라, 휘청거리는 동안 들어오는 모든
+     * 전송이 같은 판정을 실어 나른다. 그래서 매 수신마다 만들지 않고 <b>상태가 올라간 순간에만</b>
+     * 만든다. 등급이 유지되거나 내려가는 동안은 이미 올라간 이벤트가 그 상황을 대표한다.
+     * (NORMAL -> 휘청거림 -> 추락 이면 휘청거림 1건 + 추락 1건이 남는다)
+     */
+    private void raiseFallHazardEvent(Helmet helmet, WorkerState previous, FallCheckResult fall) {
+        if (helmet == null) {
+            // 등록되지 않은 deviceId. hazard_event.helmet_id 가 NOT NULL 이라 붙일 대상이 없다.
+            log.debug("등록되지 않은 헬멧이라 추락 이벤트 생략: state={}", fall.state());
+            return;
+        }
+        if (!isEscalation(previous, fall.state())) {
+            return; // 같은 상황이 이어지는 중 — 이미 만들어진 이벤트가 대표한다
+        }
+
+        HazardType hazardType = toHazardType(fall.state());
+        Worker worker = helmet.getWorker();
+
+        HazardEvent saved = hazardEventRepository.save(HazardEvent.builder()
+                .eventUid(UUID.randomUUID().toString().replace("-", "")) // CHAR(32)
+                .helmet(helmet)
+                .worker(worker)
+                // 바로 위 updateWorkerLocation 이 이번 zoneId 로 갱신해둔 구역. 이후 작업자가 이동해도
+                // 이 사건의 기록은 당시 구역을 유지해야 하므로 여기서 스냅샷으로 박아둔다.
+                .zone(worker == null ? null : worker.getCurrentZone())
+                .category(HazardCategory.FALL)
+                .hazardType(hazardType)
+                .severity(hazardSeverityPolicy.resolve(hazardType))
+                .confidence(toConfidence(fall.confidence()))
+                .occurredAt(LocalDateTime.now())
+                .status(HazardStatus.UNHANDLED)
+                .source(HazardSource.IMU_HEALTH)
+                .build());
+
+        log.info("추락 위험 이벤트 저장: id={}, deviceId={}, {} -> {}, hazardType={}",
+                saved.getId(), helmet.getDeviceId(), previous, fall.state(), hazardType);
+
+        // 대시보드로 즉시 push. 빠뜨리면 새로고침 전까지 목록이 갱신되지 않는다.
+        // 구독자 문제로 센서 수신 자체가 실패하면 안 되므로 예외는 여기서 삼킨다.
+        try {
+            hazardEventStreamService.publishHazard(saved);
+        } catch (Exception e) {
+            log.error("추락 이벤트 SSE push 실패 (저장은 완료): id={}, {}", saved.getId(), e.getMessage());
+        }
+    }
+
+    /**
+     * 이전보다 위험 등급이 올라갔는지. 직전 기록이 없거나(첫 수신) 직전이 정상 범위였다면
+     * 이번이 곧 진입이므로 true 다.
+     */
+    private boolean isEscalation(WorkerState previous, WorkerState current) {
+        if (previous == null || !isAlertState(previous)) {
+            return true;
+        }
+        return current.ordinal() > previous.ordinal();
+    }
+
+    /**
+     * 추락 트랙의 WorkerState 를 위험 종류로 옮긴다.
+     * ACTION_REQUIRED 는 posture 가 STUMBLE(휘청거림)일 때 올라오는 값이고,
+     * FALLING/FALLEN 은 자세 붕괴 또는 AI 낙상 판정이다.
+     */
+    private HazardType toHazardType(WorkerState fallState) {
+        return fallState == WorkerState.ACTION_REQUIRED ? HazardType.STUMBLE : HazardType.FALL;
+    }
+
+    /** confidence 컬럼이 DECIMAL(5,4) 라 자릿수를 맞춘다. AI 호출이 실패했으면 null 이다. */
+    private BigDecimal toConfidence(Double confidence) {
+        return confidence == null
+                ? null
+                : BigDecimal.valueOf(confidence).setScale(4, RoundingMode.HALF_UP);
     }
 
     // ===================== 공통 =====================
