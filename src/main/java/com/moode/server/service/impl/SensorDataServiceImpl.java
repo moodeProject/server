@@ -108,7 +108,7 @@ public class SensorDataServiceImpl implements SensorDataService {
 
         // 8. 추락 위험 이벤트 기록 — 관리자 대시보드(/api/v1/hazard-events)로 올린다.
         if (fallAlert) {
-            raiseFallHazardEvent(helmet, previousFallState, fallResult);
+            raiseFallHazardEvent(request.getDeviceId(), helmet, previousFallState, fallResult);
         }
 
         return SensorDataResponse.builder()
@@ -269,10 +269,14 @@ public class SensorDataServiceImpl implements SensorDataService {
      * 만든다. 등급이 유지되거나 내려가는 동안은 이미 올라간 이벤트가 그 상황을 대표한다.
      * (NORMAL -> 휘청거림 -> 추락 이면 휘청거림 1건 + 추락 1건이 남는다)
      */
-    private void raiseFallHazardEvent(Helmet helmet, WorkerState previous, FallCheckResult fall) {
+    private void raiseFallHazardEvent(String deviceId, Helmet helmet,
+                                      WorkerState previous, FallCheckResult fall) {
         if (helmet == null) {
             // 등록되지 않은 deviceId. hazard_event.helmet_id 가 NOT NULL 이라 붙일 대상이 없다.
-            log.debug("등록되지 않은 헬멧이라 추락 이벤트 생략: state={}", fall.state());
+            // 이 경우 위험을 감지하고도 대시보드에 아무것도 안 뜨는데, 화면만 봐서는 판정이
+            // 안 된 건지 헬멧이 미등록인 건지 구분할 수 없다. 그래서 debug 가 아니라 warn 이다.
+            log.warn("헬멧 미등록이라 추락 이벤트를 만들지 못함 — helmet 테이블에 device_id 등록 필요: "
+                    + "deviceId={}, state={}", deviceId, fall.state());
             return;
         }
         if (!isEscalation(previous, fall.state())) {
