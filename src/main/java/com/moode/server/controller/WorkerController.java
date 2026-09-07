@@ -1,6 +1,7 @@
 package com.moode.server.controller;
 
 import com.moode.server.common.ApiResponse;
+import com.moode.server.dto.response.HeatRiskResponse;
 import com.moode.server.dto.response.WorkerStatusResponse;
 import com.moode.server.service.WorkerService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,5 +38,17 @@ public class WorkerController {
     @GetMapping("/alerts")
     public ApiResponse<List<WorkerStatusResponse>> getAlerts() {
         return ApiResponse.success(workerService.getAlerts());
+    }
+
+    @Operation(summary = "전체 작업자 온열질환/피로도 현황 조회")
+    @GetMapping("/heat-risk")
+    public ApiResponse<List<HeatRiskResponse>> getAllHeatRiskStatus() {
+        return ApiResponse.success(workerService.getAllHeatRiskStatus());
+    }
+
+    @Operation(summary = "특정 작업자 온열질환/피로도 상세 조회")
+    @GetMapping("/{deviceId}/heat-risk")
+    public ApiResponse<HeatRiskResponse> getHeatRiskStatus(@PathVariable String deviceId) {
+        return ApiResponse.success(workerService.getHeatRiskStatus(deviceId));
     }
 }

@@ -26,3 +26,11 @@ clip:
     enabled: true
     region: ${AWS_REGION:ap-northeast-2}
     presign-ttl: 15m
+
+weather:
+  api:
+    url: https://apis.data.go.kr
+    service-key: ${WEATHER_SERVICE_KEY:}
+  site:
+    nx: ${WEATHER_SITE_NX:60}
+    ny: ${WEATHER_SITE_NY:127}

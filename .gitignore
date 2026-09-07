@@ -42,3 +42,7 @@ src/main/resources/application-secret.yml
 
 ### Claude Code ###
 .claude/
+
+### Secrets ###
+*.pem
+*.key

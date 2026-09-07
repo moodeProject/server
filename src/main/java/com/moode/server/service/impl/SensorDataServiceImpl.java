@@ -20,6 +20,7 @@ public class SensorDataServiceImpl implements SensorDataService {
 
     private final SensorDataRepository sensorDataRepository;
     private final AiServerClient aiServerClient;
+    private final WeatherHeatRiskCache weatherHeatRiskCache;
 
     private static final double ACC_LIMIT = 50.0;    // 가속도 허용 범위
     private static final double GYRO_LIMIT = 2000.0; // 각속도 허용 범위
@@ -35,11 +36,12 @@ public class SensorDataServiceImpl implements SensorDataService {
         // 2. 독립 판단 1: 추락 (MPU6050 가속도/자이로 + AI + posture)
         FallCheckResult fallResult = checkFall(request);
 
-        // 3. 독립 판단 2: 건강 (MAX30102 heartRate/spo2 + healthAbnormal + level)
+        // 3. 독립 판단 2: 건강 (MAX30102 heartRate/spo2 + healthAbnormal + level + 외부 기상)
         WorkerState healthState = checkHealth(request);
 
-        log.info("판단 결과: deviceId={}, fall={}({}), health={}",
-                request.getDeviceId(), fallResult.state(), fallResult.confidence(), healthState);
+        log.info("판단 결과: deviceId={}, fall={}({}), health={}, hrv={}, fatigue={}, heatRisk={}",
+                request.getDeviceId(), fallResult.state(), fallResult.confidence(), healthState,
+                request.getHrv(), request.getFatigueAbnormal(), request.getHeatRiskAbnormal());
 
         // 4. DB 저장
         SensorData saved = sensorDataRepository.save(
@@ -50,6 +52,9 @@ public class SensorDataServiceImpl implements SensorDataService {
                         .heartRate(request.getHeartRate())
                         .spo2(request.getSpo2())
                         .healthAbnormal(Boolean.TRUE.equals(request.getHealthAbnormal()))
+                        .hrv(request.getHrv())
+                        .fatigueAbnormal(Boolean.TRUE.equals(request.getFatigueAbnormal()))
+                        .heatRiskAbnormal(Boolean.TRUE.equals(request.getHeatRiskAbnormal()))
                         .fallState(fallResult.state())
                         .fallConfidence(fallResult.confidence())
                         .healthState(healthState)
@@ -132,7 +137,24 @@ public class SensorDataServiceImpl implements SensorDataService {
         boolean healthAbnormal = Boolean.TRUE.equals(request.getHealthAbnormal());
         WorkerState flagState = healthAbnormal ? WorkerState.RECOMMEND : WorkerState.NORMAL;
         WorkerState levelState = parseHealthLevel(request.getLevel());
-        return flagState.ordinal() >= levelState.ordinal() ? flagState : levelState;
+        WorkerState heatState = checkHeatRisk(request);
+
+        WorkerState result = flagState;
+        if (levelState.ordinal() > result.ordinal()) result = levelState;
+        if (heatState.ordinal() > result.ordinal()) result = heatState;
+        return result;
+    }
+
+    // 몸 신호(펌웨어의 heatRiskAbnormal: 활동량 대비 심박 지속 상승) + 외부 기상(체감온도 캐시) 조합.
+    // 둘 다 위험 신호면 조치 필요, 하나만이면 권고, 둘 다 아니면 정상.
+    private WorkerState checkHeatRisk(SensorDataRequest request) {
+        boolean bodySignal = Boolean.TRUE.equals(request.getHeatRiskAbnormal());
+        WorkerState externalLevel = weatherHeatRiskCache.currentLevel();
+        boolean externalSignal = externalLevel.ordinal() >= WorkerState.RECOMMEND.ordinal();
+
+        if (bodySignal && externalSignal) return WorkerState.ACTION_REQUIRED;
+        if (bodySignal || externalSignal) return WorkerState.RECOMMEND;
+        return WorkerState.NORMAL;
     }
 
     private WorkerState parseHealthLevel(String level) {

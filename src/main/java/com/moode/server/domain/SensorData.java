@@ -33,6 +33,10 @@ public class SensorData {
 
     private Boolean healthAbnormal;
 
+    private Double hrv;
+    private Boolean fatigueAbnormal;
+    private Boolean heatRiskAbnormal;
+
     // 추락 / 건강, 서로 독립적으로 판단해서 각자 저장
     @Enumerated(EnumType.STRING)
     private WorkerState fallState;
