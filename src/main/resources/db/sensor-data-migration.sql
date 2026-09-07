@@ -22,3 +22,10 @@ ALTER TABLE sensor_data
 -- 위와 마찬가지로 ddl-auto=validate 라 배포 전 반영 필수. 재실행 시 "Duplicate column name" 나면 이미 반영된 것.
 ALTER TABLE sensor_data
     ADD COLUMN posture VARCHAR(255) NULL COMMENT '센서가 보낸 자세 상태 원본 STABLE/STUMBLE/COLLAPSE';
+
+-- 구역(zoneId) 컬럼 추가 (헬멧 BLE 비콘 구역 판정 연동분)
+-- 헬멧이 보낸 구역 추정값 원본 문자열만 저장한다. zone 테이블(zone_code)과의 FK 연결은
+-- 아직 하지 않았다 — 실제 zone_code 체계 확정 및 deviceId<->worker 매핑이 먼저 필요.
+-- 위와 마찬가지로 ddl-auto=validate 라 배포 전 반영 필수. 재실행 시 "Duplicate column name" 나면 이미 반영된 것.
+ALTER TABLE sensor_data
+    ADD COLUMN zone_id VARCHAR(255) NULL COMMENT '헬멧이 BLE 비콘 스캔으로 추정한 구역 (예: ZONE-01)';

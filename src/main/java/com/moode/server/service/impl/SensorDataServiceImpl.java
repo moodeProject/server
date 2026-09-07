@@ -54,6 +54,7 @@ public class SensorDataServiceImpl implements SensorDataService {
                         .fallConfidence(fallResult.confidence())
                         .healthState(healthState)
                         .posture(request.getPosture())
+                        .zoneId(request.getZoneId())
                         .build()
         );
 
@@ -71,6 +72,7 @@ public class SensorDataServiceImpl implements SensorDataService {
                 .healthState(healthState)
                 .fallConfidence(fallResult.confidence())
                 .alertTriggered(fallAlert || healthAlert)
+                .zoneId(saved.getZoneId())
                 .recordedAt(saved.getRecordedAt())
                 .build();
     }
