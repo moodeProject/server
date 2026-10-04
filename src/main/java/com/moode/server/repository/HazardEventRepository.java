@@ -1,12 +1,15 @@
 package com.moode.server.repository;
 
+import com.moode.server.domain.HazardCategory;
 import com.moode.server.domain.HazardEvent;
+import com.moode.server.domain.HazardStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 목록 조회 필터(category/severity/status/기간)가 전부 선택값이라
@@ -24,4 +27,9 @@ public interface HazardEventRepository
      */
     @Query("SELECT e.category, COUNT(e) FROM HazardEvent e GROUP BY e.category")
     List<Object[]> countByCategory();
+
+    // 작업자 관리 상세/목록의 "외부요인" 블록. 아직 처리되지 않은(미해결) 영상 기반 위험 중 가장
+    // 최근 것 하나만 있으면 된다 — handle()로 RESOLVED 처리되면 더 이상 뜨지 않는다.
+    Optional<HazardEvent> findFirstByWorker_IdAndCategoryAndStatusInOrderByOccurredAtDesc(
+            Long workerId, HazardCategory category, List<HazardStatus> statuses);
 }
