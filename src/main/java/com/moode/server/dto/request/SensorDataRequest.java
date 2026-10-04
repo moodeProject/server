@@ -37,4 +37,10 @@ public class SensorDataRequest {
             example = "ZONE-01",
             nullable = true)
     private String zoneId;
+
+    @Schema(description = "펌웨어 온보드 낙상 판정 결과 (Random Forest, fallDetector.h)",
+            example = "false", nullable = true)
+    private Boolean fallDetected;
+    @Schema(description = "펌웨어 온보드 낙상 확률 (0.0~1.0)", example = "0.0", nullable = true)
+    private Double fallConfidence;
 }
