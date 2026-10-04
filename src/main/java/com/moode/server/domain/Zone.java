@@ -14,7 +14,11 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
         name = "zone",
-        uniqueConstraints = @UniqueConstraint(name = "uk_zone_zone_code", columnNames = "zone_code")
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_zone_zone_code", columnNames = "zone_code"),
+                // 작업자 관리 "소속 구역" 텍스트의 find-or-create 조회 키. 중복 생성을 막는다.
+                @UniqueConstraint(name = "uk_zone_zone_name", columnNames = "zone_name")
+        }
 )
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

@@ -45,6 +45,12 @@ public class Worker {
     @Builder.Default
     private WorkerStatus status = WorkerStatus.OFF_DUTY;
 
+    // 소프트 삭제. hazard_event/work_log 등이 worker_id 를 참조하고 있어 hard delete 는
+    // FK 위반으로 거의 항상 실패한다 — 목록/검색에서 숨기는 용도로 false 처리한다.
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean active = true;
+
     // 현재 위치한 구역. 위험 이벤트 수신 시 zone 스냅샷의 출처가 된다.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "current_zone_id", foreignKey = @ForeignKey(name = "fk_worker_current_zone"))
@@ -111,5 +117,21 @@ public class Worker {
     /** 퇴근 처리 시 작업 상태를 OFF_DUTY 로 바꾼다. */
     public void endWork() {
         this.status = WorkerStatus.OFF_DUTY;
+    }
+
+    // ===== 작업자 관리(CRUD). WorkerManagementServiceImpl 에서만 호출한다. =====
+
+    public void updateProfile(String name, Zone zone) {
+        this.name = name;
+        this.currentZone = zone;
+    }
+
+    /** 소프트 삭제. 이미 비활성이어도 멱등하게 다시 호출 가능하다. */
+    public void deactivate() {
+        this.active = false;
+    }
+
+    public boolean isActive() {
+        return Boolean.TRUE.equals(active);
     }
 }
