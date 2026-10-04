@@ -43,3 +43,12 @@ clip:
     region: ap-northeast-2
     presign-ttl: 15m
     local-base-url: ""
+
+jwt:
+  # secret 은 비밀값이라 여기 기본값을 두지 않는다. local/prod 프로파일에서 각자 정의한다.
+  access-token-validity-seconds: 3600
+
+auth:
+  admin:
+    # 가입 즉시 APPROVED 처리할지. 기본은 false(정식 승인 절차). 데모에서만 local/운영 환경변수로 켠다.
+    auto-approve-signup: false

@@ -45,7 +45,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ApiResponse<Void> handleUnauthorized(UnauthorizedException e) {
         log.error("인증 실패: {}", e.getMessage());
-        return ApiResponse.fail(e.getMessage());
+        return e.getCode() != null ? ApiResponse.fail(e.getCode(), e.getMessage()) : ApiResponse.fail(e.getMessage());
     }
 
     @ExceptionHandler(ConflictException.class)
