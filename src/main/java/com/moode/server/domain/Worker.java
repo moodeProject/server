@@ -99,4 +99,17 @@ public class Worker {
         this.rssi = rssi;
         this.positionUpdatedAt = LocalDateTime.now();
     }
+
+    // ===== 근태(출퇴근) 연동. AttendanceServiceImpl 에서만 호출한다. =====
+    // (2026-10, 근태 API 작업 중 추가 — 주아연님 작업자 파트와 겹치는 파일이라 공유 필요)
+
+    /** 출근 처리 시 작업 상태를 WORKING 으로 바꾼다. */
+    public void startWork() {
+        this.status = WorkerStatus.WORKING;
+    }
+
+    /** 퇴근 처리 시 작업 상태를 OFF_DUTY 로 바꾼다. */
+    public void endWork() {
+        this.status = WorkerStatus.OFF_DUTY;
+    }
 }

@@ -10,14 +10,14 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 /**
- * FCM 연동 전까지 쓰는 로그 기반 임시 구현.
+ * FCM 연동 전까지 쓰던 로그 기반 임시 구현.
  *
- * <p>TODO: FCM 을 붙일 때 infrastructure 에 FcmHazardNotificationService 를 만들어 이 빈을 대체할 것.
- * 그때 ERD 의 notification 테이블에 발송 이력을 남기는 것도 함께 하면 된다.
- * 기존 SensorDataServiceImpl.triggerAlert() 의 TODO 도 같은 시점에 이 인터페이스로 흡수 가능.
+ * <p>(2026-10) {@link NotificationServiceImpl} 로 대체되어 더 이상 빈으로 등록하지 않는다
+ * (@Service 제거). notification 테이블에 실제로 저장하는 구현으로 교체되었다 — 근태/알림
+ * API 작업 중 변경. 참고용으로 클래스는 남겨 둔다. FCM 연동 시에는 NotificationServiceImpl
+ * 내부에서 실제 발송 채널을 호출하도록 확장하면 된다.
  */
 @Slf4j
-@Service
 public class LoggingHazardNotificationService implements HazardNotificationService {
 
     @Override
