@@ -3,6 +3,9 @@ package com.moode.server.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moode.server.domain.*;
 import com.moode.server.repository.AdminRepository;
+import com.moode.server.repository.HazardClipRepository;
+import com.moode.server.repository.HazardEventActionRepository;
+import com.moode.server.repository.HazardEventRepository;
 import com.moode.server.repository.HelmetRepository;
 import com.moode.server.repository.WorkerRepository;
 import com.moode.server.security.JwtTokenProvider;
@@ -40,14 +43,21 @@ class AuthControllerTest {
     @Autowired private ObjectMapper objectMapper;
     @Autowired private WorkerRepository workerRepository;
     @Autowired private HelmetRepository helmetRepository;
+    @Autowired private HazardEventActionRepository hazardEventActionRepository;
+    @Autowired private HazardClipRepository hazardClipRepository;
+    @Autowired private HazardEventRepository hazardEventRepository;
     @Autowired private AdminRepository adminRepository;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private JwtTokenProvider jwtTokenProvider;
 
     @BeforeEach
     void clean() {
-        // H2 는 테스트 클래스 간에 공유되는 인메모리 DB라 worker 를 지우기 전에
-        // 그걸 참조하는 helmet 부터 지운다(FK 위반 방지, 다른 컨트롤러 테스트와 동일한 패턴).
+        // H2 는 테스트 클래스 간에 공유되는 인메모리 DB라, worker/helmet 을 지우기 전에
+        // 그걸 참조하는 hazard_event(와 그걸 참조하는 action/clip)부터 지운다 —
+        // HazardEventControllerTest 와 동일한 순서(자식 -> 부모).
+        hazardEventActionRepository.deleteAll();
+        hazardClipRepository.deleteAll();
+        hazardEventRepository.deleteAll();
         helmetRepository.deleteAll();
         workerRepository.deleteAll();
         adminRepository.deleteAll();

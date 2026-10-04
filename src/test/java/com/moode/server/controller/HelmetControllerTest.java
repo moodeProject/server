@@ -34,6 +34,10 @@ class HelmetControllerTest {
     @Autowired private HelmetRepository helmetRepository;
     @Autowired private ZoneRepository zoneRepository;
     @Autowired private AdminRepository adminRepository;
+    @Autowired private HazardEventRepository hazardEventRepository;
+    @Autowired private HazardEventActionRepository hazardEventActionRepository;
+    @Autowired private HazardClipRepository hazardClipRepository;
+    @Autowired private SensorDataRepository sensorDataRepository;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private JwtTokenProvider jwtTokenProvider;
     @Autowired private TestFixtures fixtures;
@@ -42,6 +46,12 @@ class HelmetControllerTest {
 
     @BeforeEach
     void setUp() {
+        // 공유 H2 인메모리 DB에서 다른 테스트 클래스가 남긴 행과 FK 가 얽히지 않도록
+        // 자식 -> 부모 순서로 지운다 (HazardEventControllerTest 와 동일한 순서).
+        hazardEventActionRepository.deleteAll();
+        hazardClipRepository.deleteAll();
+        hazardEventRepository.deleteAll();
+        sensorDataRepository.deleteAll();
         helmetRepository.deleteAll();
         workerRepository.deleteAll();
         zoneRepository.deleteAll();
