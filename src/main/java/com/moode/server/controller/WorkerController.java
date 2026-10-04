@@ -28,8 +28,12 @@ public class WorkerController {
         return ApiResponse.success(workerService.getAllWorkersStatus());
     }
 
+    // 작업자 관리(CRUD) API(WorkerManagementController)의 GET /api/workers/{workerId} 와
+    // 경로 패턴이 완전히 같아 두 핸들러가 동시에 매칭되는 순간(기동 시가 아니라 요청마다) 스프링이
+    // "Ambiguous handler methods" 로 500을 던진다. 그래서 /status 하위로 옮겼다 — 프론트에서
+    // 이 엔드포인트를 쓰고 있다면 호출 경로를 같이 바꿔줘야 한다.
     @Operation(summary = "특정 헬멧 상태 조회")
-    @GetMapping("/{deviceId}")
+    @GetMapping("/status/{deviceId}")
     public ApiResponse<WorkerStatusResponse> getWorkerStatus(@PathVariable String deviceId) {
         return ApiResponse.success(workerService.getWorkerStatus(deviceId));
     }

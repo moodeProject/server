@@ -52,7 +52,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.CONFLICT)
     public ApiResponse<Void> handleConflict(ConflictException e) {
         log.warn("충돌: {}", e.getMessage());
-        return ApiResponse.fail(e.getMessage());
+        return e.getCode() != null ? ApiResponse.fail(e.getCode(), e.getMessage()) : ApiResponse.fail(e.getMessage());
     }
 
     @ExceptionHandler(UnprocessableEntityException.class)
