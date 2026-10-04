@@ -18,6 +18,14 @@ internal:
   api:
     key: test-internal-key
 
+jwt:
+  secret: test-only-jwt-secret-key-not-for-production-use-32bytes
+  access-token-validity-seconds: 3600
+
+auth:
+  admin:
+    auto-approve-signup: false
+
 hazard:
   severity:
     puddle: WARNING

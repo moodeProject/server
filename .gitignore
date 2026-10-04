@@ -43,6 +43,9 @@ src/main/resources/application-secret.yml
 ### Claude Code ###
 .claude/
 
+### macOS ###
+.DS_Store
+
 ### Secrets ###
 *.pem
 *.key
