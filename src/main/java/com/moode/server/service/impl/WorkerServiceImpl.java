@@ -24,6 +24,22 @@ public class WorkerServiceImpl implements WorkerService {
     private final WeatherHeatRiskCache weatherHeatRiskCache;
 
     @Override
+    public List<WorkerStatusResponse> getAllWorkersStatus() {
+        return sensorDataRepository.findLatestStatusPerDevice()
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Override
+    public WorkerStatusResponse getWorkerStatus(String deviceId) {
+        return sensorDataRepository
+                .findTop1ByDeviceIdOrderByRecordedAtDesc(deviceId)
+                .map(this::toResponse)
+                .orElseThrow(() -> new NotFoundException("존재하지 않는 기기입니다. " + deviceId));
+    }
+
+    @Override
     public List<WorkerStatusResponse> getAlerts() {
         return sensorDataRepository.findAlerts(ALERT_STATES)
                 .stream()
