@@ -13,9 +13,6 @@ import com.moode.server.domain.WorkerState;
 import com.moode.server.domain.Zone;
 import com.moode.server.dto.request.SensorDataRequest;
 import com.moode.server.dto.response.SensorDataResponse;
-import com.moode.server.infrastructure.client.AiServerClient;
-import com.moode.server.infrastructure.dto.request.AiRequest;
-import com.moode.server.infrastructure.dto.response.AiResponse;
 import com.moode.server.repository.HazardEventRepository;
 import com.moode.server.repository.HelmetRepository;
 import com.moode.server.repository.SensorDataRepository;
@@ -38,7 +35,6 @@ import java.util.UUID;
 public class SensorDataServiceImpl implements SensorDataService {
 
     private final SensorDataRepository sensorDataRepository;
-    private final AiServerClient aiServerClient;
     private final WeatherHeatRiskCache weatherHeatRiskCache;
     private final HelmetRepository helmetRepository;
     private final ZoneRepository zoneRepository;
@@ -46,7 +42,7 @@ public class SensorDataServiceImpl implements SensorDataService {
     private final HazardSeverityPolicy hazardSeverityPolicy;
     private final HazardEventStreamService hazardEventStreamService;
 
-    private static final double ACC_LIMIT = 50.0;    // 가속도 허용 범위
+    private static final double ACC_LIMIT = 160.0;   // 가속도 허용 범위 (MPU6050 ±16g = 약 157 m/s^2)
     private static final double GYRO_LIMIT = 2000.0; // 각속도 허용 범위
 
     @Override
@@ -65,7 +61,7 @@ public class SensorDataServiceImpl implements SensorDataService {
                 .map(SensorData::getFallState)
                 .orElse(null);
 
-        // 3. 독립 판단 1: 추락 (MPU6050 가속도/자이로 + AI + posture)
+        // 3. 독립 판단 1: 추락 (펌웨어 온보드 AI 결과 + posture)
         FallCheckResult fallResult = checkFall(request);
 
         // 4. 독립 판단 2: 건강 (MAX30102 heartRate/spo2 + healthAbnormal + level + 외부 기상)
@@ -126,18 +122,16 @@ public class SensorDataServiceImpl implements SensorDataService {
     // ===================== 1. 추락 (독립) =====================
 
     private FallCheckResult checkFall(SensorDataRequest request) {
-        AiResponse aiResponse = callAiServer(request);
-
-        if (aiResponse != null && aiResponse.isBuffered()) {
-            // AI가 아직 최근 샘플을 충분히 못 모아서 진짜 판단을 안 한 상태.
-            // fallDetected=false로 오지만 "정상 확인됨"이 아니라 "판단 보류"라는 뜻이므로 구분해서 로그만 남김.
-            log.info("AI 버퍼링 중이라 아직 판단 안 함: deviceId={}, bufferSize={}",
-                    request.getDeviceId(), aiResponse.getBufferSize());
+        // 낙상 추론은 펌웨어(ESP32)에서 온보드로 수행하고 결과만 받는다. (FastAPI /predict 호출 제거 — 지연 때문)
+        if (request.getFallDetected() == null) {
+            // 온보드 판정 결과가 없는 구버전 펌웨어 등. "정상 확인됨"이 아니라 "판정 없음"이므로 구분해서 로그만 남김.
+            log.info("펌웨어 낙상 판정 결과 없음(판정 보류): deviceId={}", request.getDeviceId());
         }
 
-        boolean aiFallDetected = aiResponse != null && aiResponse.isFallDetected();
-        Double confidence = aiResponse != null ? aiResponse.getConfidence() : null;
+        boolean aiFallDetected = Boolean.TRUE.equals(request.getFallDetected());
+        Double confidence = request.getFallConfidence();
 
+        // AI 낙상 판정과 펌웨어 자세 판정 중 더 심각한 쪽을 최종 추락 상태로 쓴다.
         WorkerState aiState = aiFallDetected ? WorkerState.FALLEN : WorkerState.NORMAL;
         WorkerState postureState = mapPostureToFallState(request.getPosture());
         WorkerState finalFallState = aiState.ordinal() >= postureState.ordinal() ? aiState : postureState;
@@ -154,21 +148,6 @@ public class SensorDataServiceImpl implements SensorDataService {
             case "COLLAPSE" -> WorkerState.FALLING;        // 쓰러짐 감지, AI 미확정
             default -> WorkerState.NORMAL;                 // STABLE 등
         };
-    }
-
-    private AiResponse callAiServer(SensorDataRequest req) {
-        try {
-            AiRequest aiRequest = AiRequest.builder()
-                    .deviceId(req.getDeviceId())
-                    .ax(req.getAx()).ay(req.getAy()).az(req.getAz())
-                    .gx(req.getGx()).gy(req.getGy()).gz(req.getGz())
-                    .heartRate(req.getHeartRate()).spo2(req.getSpo2())
-                    .build();
-            return aiServerClient.predict(aiRequest);
-        } catch (Exception e) {
-            log.error("AI 서버 호출 실패 : {}", e.getMessage());
-            return null;
-        }
     }
 
     private record FallCheckResult(WorkerState state, Double confidence) {
