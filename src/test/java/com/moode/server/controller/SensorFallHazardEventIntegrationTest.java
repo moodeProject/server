@@ -148,6 +148,53 @@ class SensorFallHazardEventIntegrationTest {
                 .andExpect(jsonPath("$.summary.fall").value(2));
     }
 
+    /** 펌웨어가 낙상 감지 직후, 그리고 의식불명 확정 시 보내는 payload. */
+    private void sendFall(boolean unconscious) throws Exception {
+        mockMvc.perform(post(SENSOR_PATH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "deviceId": "%s",
+                                  "ax": 0.5, "ay": 0.3, "az": 9.6,
+                                  "gx": 12.0, "gy": -8.0, "gz": 3.0,
+                                  "posture": "STABLE",
+                                  "zoneId": "A-3F",
+                                  "fallDetected": true,
+                                  "fallConfidence": 0.92,
+                                  "unconscious": %s
+                                }
+                                """.formatted(helmet.getDeviceId(), unconscious)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("낙상 뒤 의식불명이 확정되면 의식불명 이벤트가 따로 만들어진다")
+    void unconsciousAfterFallCreatesSeparateEvent() throws Exception {
+        sendFall(false);  // 낙상 감지 즉시 전송
+        sendFall(false);  // 같은 낙상 상태가 이어지는 정기 전송
+        sendFall(true);   // 무움직임 확인 후 의식불명 확정
+
+        assertThat(hazardEventRepository.count()).isEqualTo(2);
+
+        // 이미 추락(FALLEN)으로 올라가 있어도 의식불명은 한 단계 위라 묻히지 않는다.
+        mockMvc.perform(get(HAZARD_PATH))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].hazardType").value("unconscious"))
+                .andExpect(jsonPath("$.content[0].severity").value("DANGER"))
+                .andExpect(jsonPath("$.content[0].zone.code").value("A-3F"))
+                .andExpect(jsonPath("$.content[1].hazardType").value("fall"))
+                .andExpect(jsonPath("$.summary.fall").value(2));
+    }
+
+    @Test
+    @DisplayName("의식불명 상태가 이어지는 동안은 이벤트를 새로 만들지 않는다")
+    void unconsciousDoesNotPileUp() throws Exception {
+        sendFall(true);
+        sendFall(true);
+
+        assertThat(hazardEventRepository.count()).isEqualTo(1);
+    }
+
     @Test
     @DisplayName("자세가 정상이면 위험 이벤트를 만들지 않는다")
     void stableCreatesNothing() throws Exception {

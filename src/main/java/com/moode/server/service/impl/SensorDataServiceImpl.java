@@ -131,6 +131,11 @@ public class SensorDataServiceImpl implements SensorDataService {
         boolean aiFallDetected = Boolean.TRUE.equals(request.getFallDetected());
         Double confidence = request.getFallConfidence();
 
+        // 의식불명은 펌웨어가 낙상 이후 무움직임까지 확인한 최종 판정이라 다른 판정보다 우선한다.
+        if (Boolean.TRUE.equals(request.getUnconscious())) {
+            return new FallCheckResult(WorkerState.UNCONSCIOUS, confidence);
+        }
+
         // AI 낙상 판정과 펌웨어 자세 판정 중 더 심각한 쪽을 최종 추락 상태로 쓴다.
         WorkerState aiState = aiFallDetected ? WorkerState.FALLEN : WorkerState.NORMAL;
         WorkerState postureState = mapPostureToFallState(request.getPosture());
@@ -307,10 +312,14 @@ public class SensorDataServiceImpl implements SensorDataService {
     /**
      * 추락 트랙의 WorkerState 를 위험 종류로 옮긴다.
      * ACTION_REQUIRED 는 posture 가 STUMBLE(휘청거림)일 때 올라오는 값이고,
-     * FALLING/FALLEN 은 자세 붕괴 또는 AI 낙상 판정이다.
+     * FALLING/FALLEN 은 자세 붕괴 또는 AI 낙상 판정, UNCONSCIOUS 는 펌웨어 의식불명 판정이다.
      */
     private HazardType toHazardType(WorkerState fallState) {
-        return fallState == WorkerState.ACTION_REQUIRED ? HazardType.STUMBLE : HazardType.FALL;
+        return switch (fallState) {
+            case ACTION_REQUIRED -> HazardType.STUMBLE;
+            case UNCONSCIOUS -> HazardType.UNCONSCIOUS;
+            default -> HazardType.FALL;
+        };
     }
 
     /** confidence 컬럼이 DECIMAL(5,4) 라 자릿수를 맞춘다. AI 호출이 실패했으면 null 이다. */

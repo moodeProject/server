@@ -18,7 +18,7 @@ public class WorkerServiceImpl implements WorkerService {
 
     // 알림 대상으로 취급할 상태
     private static final List<WorkerState> ALERT_STATES =
-            List.of(WorkerState.ACTION_REQUIRED, WorkerState.FALLING, WorkerState.FALLEN);
+            List.of(WorkerState.ACTION_REQUIRED, WorkerState.FALLING, WorkerState.FALLEN, WorkerState.UNCONSCIOUS);
 
     private final SensorDataRepository sensorDataRepository;
     private final WeatherHeatRiskCache weatherHeatRiskCache;

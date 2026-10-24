@@ -43,4 +43,10 @@ public class SensorDataRequest {
     private Boolean fallDetected;
     @Schema(description = "펌웨어 온보드 낙상 확률 (0.0~1.0)", example = "0.0", nullable = true)
     private Double fallConfidence;
+
+    @Schema(description = "펌웨어 의식불명 판정 결과. 낙상 감지 후 본인 확인 안내에도 움직임이 없어 "
+            + "의식불명으로 확정되면 true 로 온다. true 면 추락 상태가 UNCONSCIOUS 가 되고 "
+            + "위험 이벤트(hazardType=unconscious, DANGER)가 따로 만들어진다.",
+            example = "false", nullable = true)
+    private Boolean unconscious;
 }

@@ -1,6 +1,7 @@
 package com.moode.server.dto.response;
 
 import com.moode.server.domain.WorkerState;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -13,6 +14,7 @@ public class SensorDataResponse {
     private String deviceId;
 
     // 추락 / 건강, 서로 독립적인 판단 결과
+    @Schema(description = "추락 판정 상태. NORMAL < ACTION_REQUIRED(휘청거림) < FALLING(자세 붕괴) < FALLEN(낙상) < UNCONSCIOUS(낙상 후 의식불명)", example = "NORMAL", nullable = true)
     private WorkerState fallState;
     private WorkerState healthState;
 
