@@ -8,7 +8,7 @@ import java.util.Arrays;
 
 /**
  * 감지되는 위험요소 종류. 감지 경로가 둘이다.
- * PUDDLE/POTHOLE/FORKLIFT 는 영상(AI 서버)에서, STUMBLE/FALL 은 헬멧 IMU 에서 온다.
+ * PUDDLE/POTHOLE/FORKLIFT 는 영상(AI 서버)에서, STUMBLE/FALL/UNCONSCIOUS 는 헬멧 IMU 에서 온다.
  * AI 서버는 소문자 원본값(puddle / pothole / forklift)만 보내고 등급 판정은 하지 않는다.
  * ({@link #from} 은 AI 서버 수신 전용이라 IMU 쪽 값은 서버가 직접 지정한다)
  *
@@ -35,7 +35,7 @@ public enum HazardType {
             "작업 통로에 지게차 접근 감지. 충돌 위험.",
             "작업자에게 즉시 경고하고 구역 접근 통제가 필요합니다."),
 
-    // 아래 둘은 영상이 아니라 헬멧 IMU 에서 온다. category=FALL, source=IMU_HEALTH 로 저장되고
+    // 아래 셋은 영상이 아니라 헬멧 IMU 에서 온다. category=FALL, source=IMU_HEALTH 로 저장되고
     // 감지 주체만 다를 뿐 목록/상세/조치는 영상 이벤트와 완전히 같은 경로를 탄다.
     STUMBLE(HazardSeverity.WARNING, "휘청거림", "균형 상실 및 추락 위험",
             "헬멧 센서에서 휘청거림 감지. 균형 상실로 인한 추락 위험.",
@@ -43,7 +43,11 @@ public enum HazardType {
 
     FALL(HazardSeverity.DANGER, "추락/쓰러짐", "추락 및 의식 소실",
             "헬멧 센서에서 추락 또는 자세 붕괴 감지.",
-            "작업자 상태를 즉시 확인하고 필요 시 구조를 요청하세요.");
+            "작업자 상태를 즉시 확인하고 필요 시 구조를 요청하세요."),
+
+    UNCONSCIOUS(HazardSeverity.DANGER, "의식불명", "의식 소실 및 응급 상황",
+            "낙상 후 본인 확인 안내에도 움직임이 없어 헬멧이 의식불명으로 판정.",
+            "즉시 현장으로 이동하고 119 등 응급 구조를 요청하세요.");
 
     private final HazardSeverity defaultSeverity;
 

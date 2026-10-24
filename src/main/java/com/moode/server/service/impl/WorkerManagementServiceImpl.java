@@ -283,7 +283,7 @@ public class WorkerManagementServiceImpl implements WorkerManagementService {
         return switch (state) {
             case NORMAL -> WorkerOverallStatus.NORMAL;
             case RECOMMEND -> WorkerOverallStatus.CAUTION;
-            case ACTION_REQUIRED, FALLING, FALLEN -> WorkerOverallStatus.DANGER;
+            case ACTION_REQUIRED, FALLING, FALLEN, UNCONSCIOUS -> WorkerOverallStatus.DANGER;
         };
     }
 
