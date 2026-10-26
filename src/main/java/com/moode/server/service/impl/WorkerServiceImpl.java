@@ -34,7 +34,7 @@ public class WorkerServiceImpl implements WorkerService {
     @Override
     public WorkerStatusResponse getWorkerStatus(String deviceId) {
         return sensorDataRepository
-                .findTop1ByDeviceIdOrderByRecordedAtDesc(deviceId)
+                .findTop1ByDeviceIdOrderByIdDesc(deviceId)
                 .map(this::toResponse)
                 .orElseThrow(() -> new NotFoundException("존재하지 않는 기기입니다. " + deviceId));
     }
@@ -58,7 +58,7 @@ public class WorkerServiceImpl implements WorkerService {
     @Override
     public HeatRiskResponse getHeatRiskStatus(String deviceId) {
         return sensorDataRepository
-                .findTop1ByDeviceIdOrderByRecordedAtDesc(deviceId)
+                .findTop1ByDeviceIdOrderByIdDesc(deviceId)
                 .map(this::toHeatRiskResponse)
                 .orElseThrow(() -> new NotFoundException("존재하지 않는 기기입니다. " + deviceId));
     }

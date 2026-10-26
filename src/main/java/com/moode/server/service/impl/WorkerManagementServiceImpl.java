@@ -230,7 +230,7 @@ public class WorkerManagementServiceImpl implements WorkerManagementService {
 
         SensorData latest = helmet == null
                 ? null
-                : sensorDataRepository.findTop1ByDeviceIdOrderByRecordedAtDesc(helmet.getDeviceId()).orElse(null);
+                : sensorDataRepository.findTop1ByDeviceIdOrderByIdDesc(helmet.getDeviceId()).orElse(null);
 
         WorkerOverallStatus fallStatus = toOverall(latest == null ? null : latest.getFallState());
         WorkerOverallStatus healthStatus = toOverall(latest == null ? null : latest.getHealthState());
