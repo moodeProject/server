@@ -11,18 +11,21 @@ import com.moode.server.exception.NotFoundException;
 import com.moode.server.repository.HelmetRepository;
 import com.moode.server.repository.SosRepository;
 import com.moode.server.repository.WorkerRepository;
+import com.moode.server.service.NotificationService;
 import com.moode.server.service.SosService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 /**
- * SOS 저장·조회·처리 완료까지만 담당한다.
- * 관리자에게 알리는 부분(팝업, 실시간 알림)은 알림 파트 담당이고,
+ * SOS 저장·조회·처리 완료와, SOS 접수 시 관리자 알림 저장 요청까지 담당한다.
+ * 알림 자체의 저장·조회는 {@link NotificationService} 가 맡고,
  * 관리자와의 전화 연결은 근로자 화면(tel: 링크)에서 한다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -31,6 +34,7 @@ public class SosServiceImpl implements SosService {
     private final SosRepository sosRepository;
     private final WorkerRepository workerRepository;
     private final HelmetRepository helmetRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -50,7 +54,24 @@ public class SosServiceImpl implements SosService {
                 .zone(requester.getCurrentZone())
                 .zoneUpdatedAt(requester.getPositionUpdatedAt())
                 .build();
-        return SosResponse.from(sosRepository.save(sos));
+        Sos saved = sosRepository.save(sos);
+        notifyManagers(saved, requester);
+        return SosResponse.from(saved);
+    }
+
+    /**
+     * 관리자 알림함에 SOS 접수 알림을 남긴다.
+     * 알림 저장이 실패해도 SOS 자체는 접수돼야 하므로 예외를 삼킨다.
+     * (notifySosRaised 가 별도 트랜잭션이라, 여기서 잡아도 SOS 저장 트랜잭션은 롤백 표시가 되지 않는다)
+     */
+    private void notifyManagers(Sos sos, Worker requester) {
+        try {
+            notificationService.notifySosRaised(
+                    sos.getId(), requester.getId(), requester.getName(),
+                    sos.getZone() == null ? null : sos.getZone().getZoneName());
+        } catch (Exception e) {
+            log.error("SOS 알림 저장 실패(SOS는 저장됨): sosId={}, {}", sos.getId(), e.getMessage(), e);
+        }
     }
 
     @Override

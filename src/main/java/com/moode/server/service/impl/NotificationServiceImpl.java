@@ -19,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -141,8 +142,10 @@ public class NotificationServiceImpl implements NotificationService, HazardNotif
 
     // ===================== SOS (NotificationService, 이지원님 SOS 모듈이 호출) =====================
 
+    // REQUIRES_NEW: 호출한 SOS 저장 트랜잭션과 분리한다. 알림 저장이 실패해도 SOS 접수는 롤백되면 안 된다.
+    // sos_id 에는 FK 가 없어서 SOS 가 아직 커밋되기 전이어도 저장에 문제가 없다.
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void notifySosRaised(Long sosId, Long workerId, String workerName, String zoneName) {
         // recipientAdminId 를 비워 관리자 전체 공용 수신함으로 보낸다 (manager_account 생기기 전).
         notificationRepository.save(Notification.builder()
@@ -154,6 +157,34 @@ public class NotificationServiceImpl implements NotificationService, HazardNotif
                 .triggeredBy(NotificationTriggeredBy.SYSTEM)
                 .build());
         log.warn("[알림] SOS 접수 -> sosId={}, workerId={}", sosId, workerId);
+    }
+
+    // ===================== 건강 이상 (NotificationService, SensorDataServiceImpl 이 호출) =====================
+
+    // 트랜잭션을 분리하지 않는다: 작업자 알림이 worker 행을 FK 로 참조하는데, 같은 센서 수신 요청에서
+    // 작업자 위치를 갱신하므로 분리하면 서로 잠금을 기다릴 수 있다.
+    @Override
+    @Transactional
+    public void notifyHealthAlert(Worker worker) {
+        String zoneName = worker.getCurrentZone() == null
+                ? "위치 미확인" : worker.getCurrentZone().getZoneName();
+
+        // 작업자 본인
+        notificationRepository.save(Notification.builder()
+                .recipientType(NotificationRecipientType.WORKER)
+                .recipientWorker(worker)
+                .message("건강 이상 징후가 감지되었습니다. 작업을 멈추고 상태를 확인하세요.")
+                .triggeredBy(NotificationTriggeredBy.SYSTEM)
+                .build());
+
+        // 관리자 공용 수신함 (manager_account 생기기 전이라 recipientAdminId 는 비워 둔다)
+        notificationRepository.save(Notification.builder()
+                .recipientType(NotificationRecipientType.MANAGER)
+                .message(worker.getName() + " · " + zoneName + " · 건강 이상 징후(조치 필요)")
+                .triggeredBy(NotificationTriggeredBy.SYSTEM)
+                .build());
+
+        log.warn("[알림] 건강 이상 -> {}({}), 구역={}", worker.getName(), worker.getEmployeeNo(), zoneName);
     }
 
     // ===================== 위험 이벤트 (HazardNotificationService) =====================

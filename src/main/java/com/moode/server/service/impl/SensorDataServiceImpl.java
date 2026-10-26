@@ -18,6 +18,8 @@ import com.moode.server.repository.HelmetRepository;
 import com.moode.server.repository.SensorDataRepository;
 import com.moode.server.repository.ZoneRepository;
 import com.moode.server.service.HazardEventStreamService;
+import com.moode.server.service.HazardNotificationService;
+import com.moode.server.service.NotificationService;
 import com.moode.server.service.SensorDataService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +43,8 @@ public class SensorDataServiceImpl implements SensorDataService {
     private final HazardEventRepository hazardEventRepository;
     private final HazardSeverityPolicy hazardSeverityPolicy;
     private final HazardEventStreamService hazardEventStreamService;
+    private final HazardNotificationService hazardNotificationService;
+    private final NotificationService notificationService;
 
     private static final double ACC_LIMIT = 160.0;   // 가속도 허용 범위 (MPU6050 ±16g = 약 157 m/s^2)
     private static final double GYRO_LIMIT = 2000.0; // 각속도 허용 범위
@@ -54,12 +58,13 @@ public class SensorDataServiceImpl implements SensorDataService {
             throw new IllegalArgumentException("센서 데이터가 유효 범위를 벗어났습니다.");
         }
 
-        // 2. 직전 추락 상태 — 반드시 이번 건을 저장하기 "전에" 읽어야 비교 대상이 된다.
+        // 2. 직전 추락·건강 상태 — 반드시 이번 건을 저장하기 "전에" 읽어야 비교 대상이 된다.
         //    (저장 후에 읽으면 방금 넣은 행이 잡혀서 항상 "변화 없음"이 된다)
-        WorkerState previousFallState = sensorDataRepository
+        SensorData previous = sensorDataRepository
                 .findTop1ByDeviceIdOrderByIdDesc(request.getDeviceId())
-                .map(SensorData::getFallState)
                 .orElse(null);
+        WorkerState previousFallState = previous == null ? null : previous.getFallState();
+        WorkerState previousHealthState = previous == null ? null : previous.getHealthState();
 
         // 3. 독립 판단 1: 추락 (펌웨어 온보드 AI 결과 + posture)
         FallCheckResult fallResult = checkFall(request);
@@ -101,6 +106,11 @@ public class SensorDataServiceImpl implements SensorDataService {
         // 7. 헬멧/작업자 위치(비콘 구역) 갱신 — 등록 안 된 deviceId거나 미배정 헬멧이면 조용히 스킵
         //    위험 이벤트보다 먼저 실행해야 이번에 판정된 구역이 이벤트에 박제된다.
         Helmet helmet = updateWorkerLocation(request);
+
+        // 건강 이상 알림 — 조치 필요 단계로 올라간 순간에만 작업자·관리자에게 저장한다.
+        if (healthAlert) {
+            raiseHealthNotification(helmet, previousHealthState, healthState);
+        }
 
         // 8. 추락 위험 이벤트 기록 — 관리자 대시보드(/api/v1/hazard-events)로 올린다.
         if (fallAlert) {
@@ -248,7 +258,7 @@ public class SensorDataServiceImpl implements SensorDataService {
      * 추락/휘청거림을 hazard_event 로 올려 관리자 대시보드 목록(/api/v1/hazard-events)에 노출한다.
      * 영상 감지 경로와 같은 테이블을 쓰고 source 로만 구분되므로, 목록/상세/조치 API 는 그대로 재사용된다.
      *
-     * <p>펌웨어가 50Hz 로 보내는 데다 posture 는 3초 윈도우 결과라, 휘청거리는 동안 들어오는 모든
+     * <p>펌웨어가 200ms(5Hz) 주기로 보내는 데다 posture 는 3초 윈도우 결과라, 휘청거리는 동안 들어오는 모든
      * 전송이 같은 판정을 실어 나른다. 그래서 매 수신마다 만들지 않고 <b>상태가 올라간 순간에만</b>
      * 만든다. 등급이 유지되거나 내려가는 동안은 이미 올라간 이벤트가 그 상황을 대표한다.
      * (NORMAL -> 휘청거림 -> 추락 이면 휘청거림 1건 + 추락 1건이 남는다)
@@ -289,6 +299,11 @@ public class SensorDataServiceImpl implements SensorDataService {
         log.info("추락 위험 이벤트 저장: id={}, deviceId={}, {} -> {}, hazardType={}",
                 saved.getId(), helmet.getDeviceId(), previous, fall.state(), hazardType);
 
+        // 해당 작업자에게 알림 저장. 위 isEscalation 을 통과한 "상태가 올라간 순간"에만 도달하므로
+        // 200ms 주기 수신마다 알림이 쌓이지 않는다. 작업자 미배정 헬멧이면 0건 반환(경고 로그).
+        // hazard_event 를 FK 로 참조하므로 같은 트랜잭션에서 저장한다(분리하면 미커밋 이벤트를 못 본다).
+        hazardNotificationService.notifyWorker(saved, worker);
+
         // 대시보드로 즉시 push. 빠뜨리면 새로고침 전까지 목록이 갱신되지 않는다.
         // 구독자 문제로 센서 수신 자체가 실패하면 안 되므로 예외는 여기서 삼킨다.
         try {
@@ -296,6 +311,21 @@ public class SensorDataServiceImpl implements SensorDataService {
         } catch (Exception e) {
             log.error("추락 이벤트 SSE push 실패 (저장은 완료): id={}, {}", saved.getId(), e.getMessage());
         }
+    }
+
+    /**
+     * 건강 이상 알림. 건강은 hazard_event 를 만들지 않으므로 알림만 저장한다.
+     * 낙상과 같은 isEscalation 으로 "상태가 올라간 순간"에만 보내서, 200ms 주기 수신마다 쌓이지 않게 한다.
+     * 헬멧이 등록되지 않았거나 작업자가 배정되지 않았으면 알릴 대상이 없어 건너뛴다.
+     */
+    private void raiseHealthNotification(Helmet helmet, WorkerState previous, WorkerState current) {
+        if (helmet == null || helmet.getWorker() == null) {
+            return;
+        }
+        if (!isEscalation(previous, current)) {
+            return; // 같은 상태가 이어지는 중 — 이미 보낸 알림이 대표한다
+        }
+        notificationService.notifyHealthAlert(helmet.getWorker());
     }
 
     /**
