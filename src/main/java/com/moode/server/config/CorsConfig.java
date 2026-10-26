@@ -11,6 +11,7 @@ public class CorsConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
                 .allowedOriginPatterns(
+                        "https://safeon-helmet.vercel.app",
                         "http://localhost:3000",
                         "http://localhost:3001",
                         "http://localhost:3002",
