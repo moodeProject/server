@@ -11,8 +11,6 @@ import java.util.Optional;
 
 public interface SensorDataRepository extends JpaRepository<SensorData, Long> {
 
-    Optional<SensorData> findTop1ByDeviceIdOrderByRecordedAtDesc(String deviceId);
-
     /**
      * 직전 수신분. 추락 이벤트를 "상태가 바뀐 순간"에만 만들기 위해 이번 판정과 비교하는 용도다.
      *
@@ -30,12 +28,24 @@ public interface SensorDataRepository extends JpaRepository<SensorData, Long> {
     """)
     List<SensorData> findAlerts(@Param("alertStates") List<WorkerState> alertStates);
 
+    /**
+     * 헬멧(deviceId)별 가장 최근 수신 1건.
+     *
+     * <p>예전에는 {@code recordedAt = (같은 deviceId 의 MAX(recordedAt))} 상관 서브쿼리였는데,
+     * sensor_data 에 인덱스가 없어 행마다 같은 헬멧 전체를 다시 훑었다. 헬멧이 0.2초마다 보내므로
+     * 몇 천 건만 쌓여도 수십 초가 걸려 /api/workers/status, /heat-risk 가 30초 타임아웃·500 을 냈다
+     * (로컬 MySQL 재현: 6천 건 24.8초, 2만 건 90초 초과).
+     *
+     * <p>지금은 deviceId 별 MAX(id) 를 한 번에 구해 그 행만 가져온다 — 테이블을 한 번만 훑는다.
+     * id 는 수신 순서대로 증가하므로 "가장 최근" 과 같고, recordedAt 동률로 같은 헬멧이
+     * 두 번 나오던 문제도 없어진다.
+     */
     @Query("""
         SELECT s FROM SensorData s
-        WHERE s.recordedAt = (
-            SELECT MAX(s2.recordedAt)
+        WHERE s.id IN (
+            SELECT MAX(s2.id)
             FROM SensorData s2
-            WHERE s2.deviceId = s.deviceId
+            GROUP BY s2.deviceId
         )
     """)
     List<SensorData> findLatestStatusPerDevice();
