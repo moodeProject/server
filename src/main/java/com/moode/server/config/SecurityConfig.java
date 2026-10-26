@@ -21,6 +21,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  * 동작이 바뀌면 안 되므로 anyRequest().permitAll() 로 지금까지의 "인증 없음" 상태를 그대로 유지한다.
  *
  * <p>/api/helmets/** 는 아직 컨트롤러가 없다 — 나중에 생길 때 그대로 ADMIN 게이트가 적용되도록 미리 둔다.
+ *
+ * <p>/api/me/** 는 작업자 앱 전용(WORKER). 토큰의 본인 데이터만 내려주므로 관리자 토큰은 403 이다.
  */
 @Configuration
 @RequiredArgsConstructor
@@ -50,6 +52,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/login", "/api/auth/signup", "/api/auth/logout").permitAll()
                         .requestMatchers("/api/auth/me").authenticated()
                         .requestMatchers("/api/workers/**", "/api/helmets/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers("/api/me/**").hasAuthority("ROLE_WORKER")
                         .anyRequest().permitAll())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

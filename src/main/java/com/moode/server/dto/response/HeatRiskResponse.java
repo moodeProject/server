@@ -1,5 +1,6 @@
 package com.moode.server.dto.response;
 
+import com.moode.server.domain.SensorData;
 import com.moode.server.domain.WorkerState;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -30,4 +31,36 @@ public class HeatRiskResponse {
 
     @Schema(description = "몸 신호 + 외부 기상을 조합한 최종 온열질환 위험도")
     private WorkerState heatRiskLevel;
+
+    /**
+     * 몸 신호(heatRiskAbnormal) + 외부 기상(체감온도 캐시)을 조합해 최종 온열질환 위험도를 계산한다.
+     * SensorDataServiceImpl.checkHeatRisk() 와 동일한 규칙.
+     *
+     * @param externalLevel WeatherHeatRiskCache.currentLevel()
+     */
+    public static HeatRiskResponse of(SensorData data, WorkerState externalLevel) {
+        boolean bodySignal = Boolean.TRUE.equals(data.getHeatRiskAbnormal());
+        boolean externalWarning = externalLevel.ordinal() >= WorkerState.RECOMMEND.ordinal();
+
+        WorkerState heatRiskLevel;
+        if (bodySignal && externalWarning) {
+            heatRiskLevel = WorkerState.ACTION_REQUIRED;
+        } else if (bodySignal || externalWarning) {
+            heatRiskLevel = WorkerState.RECOMMEND;
+        } else {
+            heatRiskLevel = WorkerState.NORMAL;
+        }
+
+        return HeatRiskResponse.builder()
+                .deviceId(data.getDeviceId())
+                .recordedAt(data.getRecordedAt())
+                .heartRate(data.getHeartRate())
+                .spo2(data.getSpo2())
+                .hrv(data.getHrv())
+                .fatigueAbnormal(data.getFatigueAbnormal())
+                .heatRiskAbnormal(data.getHeatRiskAbnormal())
+                .externalHeatWarning(externalWarning)
+                .heatRiskLevel(heatRiskLevel)
+                .build();
+    }
 }

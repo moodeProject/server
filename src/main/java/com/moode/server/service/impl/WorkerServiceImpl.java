@@ -86,34 +86,9 @@ public class WorkerServiceImpl implements WorkerService {
                 .build();
     }
 
-    // 몸 신호(heatRiskAbnormal) + 외부 기상(체감온도 캐시)을 조합해 최종 온열질환 위험도를 계산.
-    // SensorDataServiceImpl.checkHeatRisk() 와 동일한 규칙. heatRiskLevel 이 DB에 별도 저장되지 않으므로
-    // 조회 시점에 다시 계산한다.
+    // heatRiskLevel 이 DB에 별도 저장되지 않으므로 조회 시점에 외부 기상 캐시와 다시 조합한다.
     private HeatRiskResponse toHeatRiskResponse(SensorData data) {
-        boolean bodySignal = Boolean.TRUE.equals(data.getHeatRiskAbnormal());
-        WorkerState externalLevel = weatherHeatRiskCache.currentLevel();
-        boolean externalWarning = externalLevel.ordinal() >= WorkerState.RECOMMEND.ordinal();
-
-        WorkerState heatRiskLevel;
-        if (bodySignal && externalWarning) {
-            heatRiskLevel = WorkerState.ACTION_REQUIRED;
-        } else if (bodySignal || externalWarning) {
-            heatRiskLevel = WorkerState.RECOMMEND;
-        } else {
-            heatRiskLevel = WorkerState.NORMAL;
-        }
-
-        return HeatRiskResponse.builder()
-                .deviceId(data.getDeviceId())
-                .recordedAt(data.getRecordedAt())
-                .heartRate(data.getHeartRate())
-                .spo2(data.getSpo2())
-                .hrv(data.getHrv())
-                .fatigueAbnormal(data.getFatigueAbnormal())
-                .heatRiskAbnormal(data.getHeatRiskAbnormal())
-                .externalHeatWarning(externalWarning)
-                .heatRiskLevel(heatRiskLevel)
-                .build();
+        return HeatRiskResponse.of(data, weatherHeatRiskCache.currentLevel());
     }
 
     private boolean isPostureAbnormal(String posture) {
