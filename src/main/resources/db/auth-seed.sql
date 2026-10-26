@@ -12,3 +12,13 @@
 INSERT INTO worker (employee_no, password_hash, name, department, status)
 VALUES ('WK-20241103', '$2a$10$K1BBbzbx6ilQh07PlHHka.vcWAnc6Q4nAp5R3Pp9mz.yLM0tf3Dm.', '김현석', '현장관리팀', 'WORKING')
 ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash);
+
+-- 프론트 테스트용 작업자 계정. WK-20241103 은 2번 헬멧에 묶여 있어서, 1번 헬멧(H-001)이 배정된
+-- 테스트 작업자 WK-0001 에도 로그인을 열어준다. 행 자체는 sensor-data-migration.sql 이 이미
+-- 만들어 두므로(password_hash 는 자리표시자) 여기서는 해시만 실제 값으로 바꾼다 — 행이 없으면
+-- 아무 일도 일어나지 않으니 sensor-data-migration.sql 을 먼저 실행할 것.
+--
+-- password_hash 는 평문 "Worker!0001" 의 BCrypt 해시(위와 같은 인코더 설정)다.
+UPDATE worker
+SET password_hash = '$2a$10$BxcQhMdJulElxSuQLrj2PeKv3rB9ebwaxCW9iN7qprYagOwrBfFiW'
+WHERE employee_no = 'WK-0001';
