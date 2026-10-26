@@ -1,6 +1,7 @@
 package com.moode.server.service;
 
 import com.moode.server.domain.NotificationRecipientType;
+import com.moode.server.domain.Worker;
 import com.moode.server.dto.response.NotificationListResponse;
 
 /**
@@ -33,4 +34,11 @@ public interface NotificationService {
      * SosRequest 엔티티에 의존하지 않도록 원시값만 받는다. 이지원님 SOS 작업에서 호출.
      */
     void notifySosRaised(Long sosId, Long workerId, String workerName, String zoneName);
+
+    /**
+     * 건강 이상(조치 필요 단계 진입) 알림. 작업자 본인과 관리자 공용 수신함에 1건씩 저장한다.
+     * 건강 이상은 hazard_event 를 만들지 않으므로 event 가 비어 있는 알림이다.
+     * 센서 수신(SensorDataServiceImpl)에서 "상태가 올라간 순간"에만 호출한다.
+     */
+    void notifyHealthAlert(Worker worker);
 }
