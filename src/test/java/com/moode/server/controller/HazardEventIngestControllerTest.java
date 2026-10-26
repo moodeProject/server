@@ -11,6 +11,7 @@ import com.moode.server.repository.HelmetRepository;
 import com.moode.server.repository.InboundMessageRepository;
 import com.moode.server.repository.WorkerRepository;
 import com.moode.server.repository.ZoneRepository;
+import com.moode.server.service.impl.VisionWarningRegistry;
 import com.moode.server.support.TestFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -55,6 +56,8 @@ class HazardEventIngestControllerTest {
     private ZoneRepository zoneRepository;
     @Autowired
     private TestFixtures fixtures;
+    @Autowired
+    private VisionWarningRegistry visionWarningRegistry;
 
     @BeforeEach
     void clean() {
@@ -64,7 +67,12 @@ class HazardEventIngestControllerTest {
         helmetRepository.deleteAll();
         workerRepository.deleteAll();
         zoneRepository.deleteAll();
-        fixtures.defaultHelmet();
+        Helmet helmet = fixtures.defaultHelmet();
+        // 영상 단독 감지는 헬멧 경고로만 끝나고 이벤트가 생기지 않는다. 이 클래스는 이벤트 저장·클립·SSE 경로를
+        // 보므로 헬멧 센서 이상이 이미 있었던 상황(=위험으로 올라가는 경우)으로 둔다.
+        // 영상 단독 경로는 VisionWarningEscalationTest 참고.
+        visionWarningRegistry.clear();
+        visionWarningRegistry.noteSensorAbnormal(helmet.getDeviceId());
     }
 
     private MockHttpServletRequestBuilder send(String body) {
@@ -163,8 +171,9 @@ class HazardEventIngestControllerTest {
         assertThat(events).hasSize(2);
         assertThat(events).extracting(HazardEvent::getHazardType)
                 .containsExactlyInAnyOrder(HazardType.PUDDLE, HazardType.FORKLIFT);
+        // 영상+센서 이상이 겹쳐 올라온 이벤트는 종류와 상관없이 위험이다 (물웅덩이도 DANGER)
         assertThat(events).extracting(HazardEvent::getSeverity)
-                .containsExactlyInAnyOrder(HazardSeverity.WARNING, HazardSeverity.DANGER);
+                .containsOnly(HazardSeverity.DANGER);
     }
 
     @Test

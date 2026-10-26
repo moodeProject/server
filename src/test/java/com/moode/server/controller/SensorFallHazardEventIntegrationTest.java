@@ -9,6 +9,7 @@ import com.moode.server.repository.HelmetRepository;
 import com.moode.server.repository.SensorDataRepository;
 import com.moode.server.repository.WorkerRepository;
 import com.moode.server.repository.ZoneRepository;
+import com.moode.server.service.impl.VisionWarningRegistry;
 import com.moode.server.support.TestFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -55,6 +56,7 @@ class SensorFallHazardEventIntegrationTest {
     @Autowired private WorkerRepository workerRepository;
     @Autowired private ZoneRepository zoneRepository;
     @Autowired private TestFixtures fixtures;
+    @Autowired private VisionWarningRegistry visionWarningRegistry;
 
     @MockitoBean private AiServerClient aiServerClient;
 
@@ -70,6 +72,7 @@ class SensorFallHazardEventIntegrationTest {
         workerRepository.deleteAll();
         zoneRepository.deleteAll();
         helmet = fixtures.defaultHelmet(); // H-001 / ESP32-001 / 박민수 / A-3F
+        visionWarningRegistry.clear();
 
         // AI 서버 미가동 상태. checkFall() 이 예외를 삼키고 posture 만으로 판정한다.
         given(aiServerClient.predict(any())).willReturn(null);

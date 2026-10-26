@@ -18,6 +18,8 @@ import com.moode.server.repository.HelmetRepository;
 import com.moode.server.repository.SensorDataRepository;
 import com.moode.server.repository.ZoneRepository;
 import com.moode.server.service.HazardEventStreamService;
+import com.moode.server.service.HazardNotificationService;
+import com.moode.server.service.HelmetAssignment;
 import com.moode.server.service.SensorDataService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -41,6 +44,9 @@ public class SensorDataServiceImpl implements SensorDataService {
     private final HazardEventRepository hazardEventRepository;
     private final HazardSeverityPolicy hazardSeverityPolicy;
     private final HazardEventStreamService hazardEventStreamService;
+    private final HazardNotificationService hazardNotificationService;
+    private final HazardEventWriter hazardEventWriter;
+    private final VisionWarningRegistry visionWarningRegistry;
 
     private static final double ACC_LIMIT = 160.0;   // 가속도 허용 범위 (MPU6050 ±16g = 약 157 m/s^2)
     private static final double GYRO_LIMIT = 2000.0; // 각속도 허용 범위
@@ -107,6 +113,14 @@ public class SensorDataServiceImpl implements SensorDataService {
             raiseFallHazardEvent(request.getDeviceId(), helmet, previousFallState, fallResult);
         }
 
+        // 9. 영상 경고 + 센서 이상이 겹치면 위험으로 올린다 (영상이 먼저 온 경우. 반대 순서는 수신 쪽에서 처리)
+        if (fallAlert || isHealthAbnormal(request, healthState)) {
+            visionWarningRegistry.noteSensorAbnormal(request.getDeviceId());
+            escalateVisionWarning(request.getDeviceId(), helmet);
+        }
+        Optional<VisionWarningRegistry.VisionWarning> visionWarning =
+                visionWarningRegistry.activeForHelmet(request.getDeviceId());
+
         return SensorDataResponse.builder()
                 .id(saved.getId())
                 .deviceId(saved.getDeviceId())
@@ -116,7 +130,50 @@ public class SensorDataServiceImpl implements SensorDataService {
                 .alertTriggered(fallAlert || healthAlert)
                 .zoneId(saved.getZoneId())
                 .recordedAt(saved.getRecordedAt())
+                .hazardWarning(visionWarning.map(VisionWarningRegistry.VisionWarning::getHazardType).orElse(null))
+                .hazardWarningSeq(visionWarning.map(VisionWarningRegistry.VisionWarning::getSeq).orElse(null))
                 .build();
+    }
+
+    /**
+     * 건강 쪽 "이상". 기상 캐시만으로 올라가는 RECOMMEND 는 여름 내내 켜져 있을 수 있어서
+     * 영상 경고를 위험으로 올리는 근거로는 쓰지 않는다. 몸 신호(healthAbnormal)나 조치 필요 등급만 본다.
+     */
+    private boolean isHealthAbnormal(SensorDataRequest request, WorkerState healthState) {
+        return Boolean.TRUE.equals(request.getHealthAbnormal())
+                || healthState.ordinal() >= WorkerState.ACTION_REQUIRED.ordinal();
+    }
+
+    private void escalateVisionWarning(String deviceId, Helmet helmet) {
+        if (helmet == null) {
+            return; // 미등록 헬멧이면 영상 경고도 생길 수 없다 (영상 수신 쪽에서 헬멧을 못 찾아 404)
+        }
+        Optional<VisionWarningRegistry.VisionWarning> warning = visionWarningRegistry.takeForEscalation(deviceId);
+        if (warning.isEmpty()) {
+            return;
+        }
+
+        Worker worker = helmet.getWorker();
+        HazardEventWriter.EscalationResult result = hazardEventWriter.saveEscalated(warning.get(),
+                new HelmetAssignment(helmet, worker, worker == null ? null : worker.getCurrentZone()));
+        HazardEvent saved = result.event();
+
+        // 대시보드 push·작업자 알림 실패로 센서 수신 자체가 실패하면 안 되므로 예외는 삼킨다.
+        try {
+            hazardEventStreamService.publishHazard(saved);
+            if (result.clipAttached()) {
+                hazardEventStreamService.publishClipReady(saved.getId());
+            }
+        } catch (Exception e) {
+            log.error("영상+센서 위험 SSE push 실패 (저장은 완료): id={}, {}", saved.getId(), e.getMessage());
+        }
+        if (worker != null) {
+            try {
+                hazardNotificationService.notifyWorker(saved, worker);
+            } catch (Exception e) {
+                log.error("영상+센서 위험 작업자 알림 실패 (저장은 완료): id={}, {}", saved.getId(), e.getMessage());
+            }
+        }
     }
 
     // ===================== 1. 추락 (독립) =====================

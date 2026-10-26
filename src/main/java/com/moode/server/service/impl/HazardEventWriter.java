@@ -53,14 +53,77 @@ public class HazardEventWriter {
     public HazardEvent recordConfirmed(HazardEventIngestRequest request, HelmetAssignment assignment) {
         recordInbound(request, InboundEventType.HAZARD_CONFIRMED);
 
-        if (request.getOccurredAt() == null) {
-            throw new IllegalArgumentException("HAZARD_CONFIRMED 에는 occurredAt 이 필요합니다.");
-        }
-        List<HazardType> hazardTypes = parseHazardTypes(request.getHazardTypes());
-        HazardType representative = pickMostSevere(hazardTypes);
-        HazardSeverity severity = hazardSeverityPolicy.resolve(representative);
+        HazardEvent saved = hazardEventRepository.save(
+                buildExternalEvent(request, assignment, HazardSeverity.DANGER, ESCALATED_DESCRIPTION));
+        log.info("위험 이벤트 저장(영상+센서 이상): id={}, eventUid={}, hazardType={}",
+                saved.getId(), saved.getEventUid(), saved.getHazardType());
+        return saved;
+    }
 
-        HazardEvent event = HazardEvent.builder()
+    /** 영상과 헬멧 센서 이상이 겹쳐 위험으로 올린 이벤트의 설명. 영상 단독 감지는 이벤트를 만들지 않는다. */
+    static final String ESCALATED_DESCRIPTION = "영상 위험 감지와 헬멧 센서 이상(자세·건강·추락)이 함께 발생.";
+
+    /**
+     * 영상 단독 감지. 대시보드 이벤트는 만들지 않고(헬멧 경고만), 같은 메시지가 재전송돼도
+     * 경고가 두 번 나지 않도록 멱등 로그만 남긴다.
+     *
+     * @return 대표 위험 종류
+     */
+    @Transactional
+    public HazardType recordWarningOnly(HazardEventIngestRequest request) {
+        recordInbound(request, InboundEventType.HAZARD_CONFIRMED);
+        requireOccurredAt(request);
+        return pickMostSevere(parseHazardTypes(request.getHazardTypes()));
+    }
+
+    /** 아직 위험으로 오르지 않은 경고의 클립. 형식만 검증하고 멱등 로그를 남긴다. 보관은 호출자가 한다. */
+    @Transactional
+    public void recordClipForWarning(HazardEventIngestRequest request) {
+        recordInbound(request, InboundEventType.CLIP_READY);
+        if (request.getClip() == null) {
+            throw new IllegalArgumentException("CLIP_READY 에는 clip 이 필요합니다.");
+        }
+        validateClip(request.getClip());
+        parseStorageType(request.getClip().getStorage());
+    }
+
+    /**
+     * 헬멧 센서 이상이 들어와 대기 중이던 영상 경고를 위험으로 올린다. 센서 수신 트랜잭션에 합류한다.
+     * 경고 단계에서 맡아 둔 클립이 있으면 함께 붙인다.
+     *
+     * @return 저장된 이벤트와, 클립을 붙였는지
+     */
+    @Transactional
+    public EscalationResult saveEscalated(VisionWarningRegistry.VisionWarning warning, HelmetAssignment assignment) {
+        HazardEvent saved = hazardEventRepository.save(
+                buildExternalEvent(warning.getRequest(), assignment, HazardSeverity.DANGER, ESCALATED_DESCRIPTION));
+
+        HazardClipRequest clip = warning.getClip();
+        if (clip != null) {
+            hazardClipRepository.save(HazardClip.builder()
+                    .hazardEvent(saved)
+                    .storageType(parseStorageType(clip.getStorage()))
+                    .bucket(clip.getBucket())
+                    .objectKey(clip.getKey())
+                    .durationSeconds(clip.getDurationSeconds())
+                    .frameCount(clip.getFrameCount())
+                    .markedOffsetSeconds(warning.getClipOffsetSeconds())
+                    .build());
+        }
+        log.info("영상 경고를 위험으로 올림(센서 이상 동반): id={}, eventUid={}, hazardType={}, 클립={}",
+                saved.getId(), saved.getEventUid(), saved.getHazardType(), clip != null);
+        return new EscalationResult(saved, clip != null);
+    }
+
+    public record EscalationResult(HazardEvent event, boolean clipAttached) {
+    }
+
+    private HazardEvent buildExternalEvent(HazardEventIngestRequest request, HelmetAssignment assignment,
+                                           HazardSeverity severity, String description) {
+        requireOccurredAt(request);
+        HazardType representative = pickMostSevere(parseHazardTypes(request.getHazardTypes()));
+
+        return HazardEvent.builder()
                 .eventUid(request.getEventId())
                 .helmet(assignment.helmet())
                 .worker(assignment.worker())
@@ -74,12 +137,14 @@ public class HazardEventWriter {
                 .detectionsJson(serializeDetections(request))
                 .occurredAt(toLocalDateTime(request.getOccurredAt()))
                 .status(HazardStatus.UNHANDLED)
+                .description(description)
                 .build();
+    }
 
-        HazardEvent saved = hazardEventRepository.save(event);
-        log.info("위험 이벤트 저장: id={}, eventUid={}, hazardType={}, severity={}",
-                saved.getId(), saved.getEventUid(), saved.getHazardType(), saved.getSeverity());
-        return saved;
+    private void requireOccurredAt(HazardEventIngestRequest request) {
+        if (request.getOccurredAt() == null) {
+            throw new IllegalArgumentException("HAZARD_CONFIRMED 에는 occurredAt 이 필요합니다.");
+        }
     }
 
     /**
