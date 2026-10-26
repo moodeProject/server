@@ -46,7 +46,9 @@ clip:
 
 jwt:
   # secret 은 비밀값이라 여기 기본값을 두지 않는다. local/prod 프로파일에서 각자 정의한다.
-  access-token-validity-seconds: 3600
+  # 관리자 대시보드는 하루 종일 띄워 두는 화면인데 토큰 자동 연장이 없다. 1시간이면 시연 도중
+  # /api/workers/**, /api/helmets/** 가 401 로 깨져서 12시간(근무 하루)으로 늘렸다.
+  access-token-validity-seconds: 43200
 
 auth:
   admin:
