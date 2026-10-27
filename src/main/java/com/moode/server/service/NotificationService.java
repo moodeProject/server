@@ -1,5 +1,6 @@
 package com.moode.server.service;
 
+import com.moode.server.domain.HazardEvent;
 import com.moode.server.domain.NotificationRecipientType;
 import com.moode.server.domain.Worker;
 import com.moode.server.dto.response.NotificationListResponse;
@@ -36,9 +37,15 @@ public interface NotificationService {
     void notifySosRaised(Long sosId, Long workerId, String workerName, String zoneName);
 
     /**
-     * 건강 이상(조치 필요 단계 진입) 알림. 작업자 본인과 관리자 공용 수신함에 1건씩 저장한다.
-     * 건강 이상은 hazard_event 를 만들지 않으므로 event 가 비어 있는 알림이다.
-     * 센서 수신(SensorDataServiceImpl)에서 "상태가 올라간 순간"에만 호출한다.
+     * 건강 이상(조치 필요 단계 진입) 알림. 작업자 본인과 관리자 공용 수신함에 1건씩 저장하고,
+     * 두 알림 모두 건강 사고(hazard_event)에 연결한다.
+     * 센서 수신(SensorDataServiceImpl)에서 사고가 새로 만들어진 순간에만 호출한다.
      */
-    void notifyHealthAlert(Worker worker);
+    void notifyHealthAlert(HazardEvent event, Worker worker);
+
+    /**
+     * 추락 사고 발생 시 관리자 공용 수신함에 알림을 저장한다. 사고알림 기록의 근거가 된다.
+     * 작업자 알림은 HazardNotificationService.notifyWorker 가 따로 보낸다.
+     */
+    void notifyFallAlert(HazardEvent event, Worker worker);
 }

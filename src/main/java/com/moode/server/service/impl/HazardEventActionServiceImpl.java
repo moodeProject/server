@@ -57,6 +57,7 @@ public class HazardEventActionServiceImpl implements HazardEventActionService {
                 .actionType(actionType)
                 .performedBy(request.getAdminId())
                 .notifiedCount(outcome.notifiedCount())
+                .memo(request.getMemo())
                 .build());
 
         log.info("조치 기록: eventId={}, actionType={}, adminId={}, notified={}, memo={}",

@@ -47,7 +47,12 @@ public enum HazardType {
 
     UNCONSCIOUS(HazardSeverity.DANGER, "의식불명", "의식 소실 및 응급 상황",
             "낙상 후 본인 확인 안내에도 움직임이 없어 헬멧이 의식불명으로 판정.",
-            "즉시 현장으로 이동하고 119 등 응급 구조를 요청하세요.");
+            "즉시 현장으로 이동하고 119 등 응급 구조를 요청하세요."),
+
+    // 헬멧 MAX30102(심박·SpO2·HRV) 판정이 조치 필요 단계로 올라간 건강 이상. category=HEALTH, source=IMU_HEALTH
+    HEALTH_ABNORMAL(HazardSeverity.DANGER, "건강 이상", "건강 악화 및 응급 상황",
+            "헬멧 센서에서 심박·산소포화도 등 생체 신호의 건강 이상 감지.",
+            "작업을 즉시 중단하고 작업자 상태를 확인하세요. 필요 시 119 등 응급 구조를 요청하세요.");
 
     private final HazardSeverity defaultSeverity;
 

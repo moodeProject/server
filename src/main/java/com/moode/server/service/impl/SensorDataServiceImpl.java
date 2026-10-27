@@ -29,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -48,6 +50,7 @@ public class SensorDataServiceImpl implements SensorDataService {
 
     private static final double ACC_LIMIT = 160.0;   // 가속도 허용 범위 (MPU6050 ±16g = 약 157 m/s^2)
     private static final double GYRO_LIMIT = 2000.0; // 각속도 허용 범위
+    private static final int FALL_MERGE_WINDOW_SECONDS = 60; // 같은 헬멧의 추락 반복을 한 사고로 묶는 시간창
 
     @Override
     @Transactional
@@ -107,15 +110,15 @@ public class SensorDataServiceImpl implements SensorDataService {
         //    위험 이벤트보다 먼저 실행해야 이번에 판정된 구역이 이벤트에 박제된다.
         Helmet helmet = updateWorkerLocation(request);
 
-        // 건강 이상 알림 — 조치 필요 단계로 올라간 순간에만 작업자·관리자에게 저장한다.
-        if (healthAlert) {
-            raiseHealthNotification(helmet, previousHealthState, healthState);
-        }
+        // 8. 추락 위험 사고 기록 — 관리자 대시보드(/api/v1/hazard-events)로 올린다.
+        Long fallHazardEventId = fallAlert
+                ? raiseFallHazardEvent(request.getDeviceId(), helmet, previousFallState, fallResult, saved.getId())
+                : null;
 
-        // 8. 추락 위험 이벤트 기록 — 관리자 대시보드(/api/v1/hazard-events)로 올린다.
-        if (fallAlert) {
-            raiseFallHazardEvent(request.getDeviceId(), helmet, previousFallState, fallResult);
-        }
+        // 9. 건강 이상 사고 기록 — 조치 필요 단계로 올라간 순간에만 만들고 작업자·관리자에게 알린다.
+        Long healthHazardEventId = healthAlert
+                ? raiseHealthHazardEvent(request, helmet, previousHealthState, healthState, saved.getId())
+                : null;
 
         return SensorDataResponse.builder()
                 .id(saved.getId())
@@ -126,6 +129,8 @@ public class SensorDataServiceImpl implements SensorDataService {
                 .alertTriggered(fallAlert || healthAlert)
                 .zoneId(saved.getZoneId())
                 .recordedAt(saved.getRecordedAt())
+                .fallHazardEventId(fallHazardEventId)
+                .healthHazardEventId(healthHazardEventId)
                 .build();
     }
 
@@ -263,21 +268,41 @@ public class SensorDataServiceImpl implements SensorDataService {
      * 만든다. 등급이 유지되거나 내려가는 동안은 이미 올라간 이벤트가 그 상황을 대표한다.
      * (NORMAL -> 휘청거림 -> 추락 이면 휘청거림 1건 + 추락 1건이 남는다)
      */
-    private void raiseFallHazardEvent(String deviceId, Helmet helmet,
-                                      WorkerState previous, FallCheckResult fall) {
+    private Long raiseFallHazardEvent(String deviceId, Helmet helmet,
+                                      WorkerState previous, FallCheckResult fall, Long sensorDataId) {
         if (helmet == null) {
             // 등록되지 않은 deviceId. hazard_event.helmet_id 가 NOT NULL 이라 붙일 대상이 없다.
             // 이 경우 위험을 감지하고도 대시보드에 아무것도 안 뜨는데, 화면만 봐서는 판정이
             // 안 된 건지 헬멧이 미등록인 건지 구분할 수 없다. 그래서 debug 가 아니라 warn 이다.
             log.warn("헬멧 미등록이라 추락 이벤트를 만들지 못함 — helmet 테이블에 device_id 등록 필요: "
                     + "deviceId={}, state={}", deviceId, fall.state());
-            return;
+            return null;
         }
         if (!isEscalation(previous, fall.state())) {
-            return; // 같은 상황이 이어지는 중 — 이미 만들어진 이벤트가 대표한다
+            return null; // 같은 상황이 이어지는 중 — 이미 만들어진 이벤트가 대표한다
         }
 
         HazardType hazardType = toHazardType(fall.state());
+
+        // 같은 헬멧의 미처리·처리중 추락 사고가 시간창 안에 있으면 새로 만들지 않고 그 사고를 갱신한다.
+        // 휘청거림 → 추락처럼 같은 사고가 단계를 올리는 경우에는 위험 종류만 더 높은 쪽으로 바꾼다.
+        Optional<HazardEvent> openIncident = hazardEventRepository
+                .findFirstByHelmet_IdAndCategoryAndStatusInAndOccurredAtAfterOrderByOccurredAtDesc(
+                        helmet.getId(), HazardCategory.FALL,
+                        List.of(HazardStatus.UNHANDLED, HazardStatus.IN_PROGRESS),
+                        LocalDateTime.now().minusSeconds(FALL_MERGE_WINDOW_SECONDS));
+        if (openIncident.isPresent()) {
+            HazardEvent existing = openIncident.get();
+            HazardType before = existing.getHazardType();
+            if (hazardRank(hazardType) > hazardRank(before)) {
+                existing.escalate(hazardType, hazardSeverityPolicy.resolve(hazardType));
+                log.info("추락 사고 단계 상향: id={}, {} -> {}", existing.getId(), before, hazardType);
+            } else {
+                log.info("추락 사고 중복 병합(알림 생략): id={}, state={}", existing.getId(), fall.state());
+            }
+            return existing.getId();
+        }
+
         Worker worker = helmet.getWorker();
 
         HazardEvent saved = hazardEventRepository.save(HazardEvent.builder()
@@ -294,6 +319,7 @@ public class SensorDataServiceImpl implements SensorDataService {
                 .occurredAt(LocalDateTime.now())
                 .status(HazardStatus.UNHANDLED)
                 .source(HazardSource.IMU_HEALTH)
+                .sensorDataId(sensorDataId)
                 .build());
 
         log.info("추락 위험 이벤트 저장: id={}, deviceId={}, {} -> {}, hazardType={}",
@@ -304,6 +330,9 @@ public class SensorDataServiceImpl implements SensorDataService {
         // hazard_event 를 FK 로 참조하므로 같은 트랜잭션에서 저장한다(분리하면 미커밋 이벤트를 못 본다).
         hazardNotificationService.notifyWorker(saved, worker);
 
+        // 관리자 사고알림 기록에 추락을 남긴다. 작업자 미배정 헬멧이어도 관리자에게는 알린다.
+        notificationService.notifyFallAlert(saved, worker);
+
         // 대시보드로 즉시 push. 빠뜨리면 새로고침 전까지 목록이 갱신되지 않는다.
         // 구독자 문제로 센서 수신 자체가 실패하면 안 되므로 예외는 여기서 삼킨다.
         try {
@@ -311,21 +340,66 @@ public class SensorDataServiceImpl implements SensorDataService {
         } catch (Exception e) {
             log.error("추락 이벤트 SSE push 실패 (저장은 완료): id={}, {}", saved.getId(), e.getMessage());
         }
+        return saved.getId();
     }
 
     /**
-     * 건강 이상 알림. 건강은 hazard_event 를 만들지 않으므로 알림만 저장한다.
-     * 낙상과 같은 isEscalation 으로 "상태가 올라간 순간"에만 보내서, 200ms 주기 수신마다 쌓이지 않게 한다.
-     * 헬멧이 등록되지 않았거나 작업자가 배정되지 않았으면 알릴 대상이 없어 건너뛴다.
+     * 건강 이상을 hazard_event(카테고리 HEALTH)로 올리고 작업자·관리자에게 알린다.
+     * 낙상과 같은 isEscalation 으로 "상태가 올라간 순간"에만 만들고, 같은 헬멧에 미처리·처리중 건강 사고가
+     * 이미 있으면 새로 만들지 않는다. 발생 당시 심박·SpO₂·HRV·위험 단계를 사고에 함께 저장한다.
+     * 헬멧이 등록되지 않았거나 작업자가 배정되지 않았으면 알릴 대상이 없어 알림은 건너뛴다.
      */
-    private void raiseHealthNotification(Helmet helmet, WorkerState previous, WorkerState current) {
-        if (helmet == null || helmet.getWorker() == null) {
-            return;
+    private Long raiseHealthHazardEvent(SensorDataRequest request, Helmet helmet,
+                                        WorkerState previous, WorkerState current, Long sensorDataId) {
+        if (helmet == null) {
+            log.warn("헬멧 미등록이라 건강 이벤트를 만들지 못함: deviceId={}, state={}", request.getDeviceId(), current);
+            return null;
         }
         if (!isEscalation(previous, current)) {
-            return; // 같은 상태가 이어지는 중 — 이미 보낸 알림이 대표한다
+            return null; // 같은 건강 이상이 이어지는 중 — 이미 만들어진 사고가 대표한다
         }
-        notificationService.notifyHealthAlert(helmet.getWorker());
+
+        Optional<HazardEvent> open = hazardEventRepository
+                .findFirstByHelmet_IdAndCategoryAndStatusInOrderByOccurredAtDesc(
+                        helmet.getId(), HazardCategory.HEALTH,
+                        List.of(HazardStatus.UNHANDLED, HazardStatus.IN_PROGRESS));
+        if (open.isPresent()) {
+            log.info("건강 사고 중복 생성 방지(미처리 사고 존재): id={}, state={}", open.get().getId(), current);
+            return open.get().getId();
+        }
+
+        Worker worker = helmet.getWorker();
+        HazardEvent saved = hazardEventRepository.save(HazardEvent.builder()
+                .eventUid(UUID.randomUUID().toString().replace("-", "")) // CHAR(32)
+                .helmet(helmet)
+                .worker(worker)
+                .zone(worker == null ? null : worker.getCurrentZone())
+                .category(HazardCategory.HEALTH)
+                .hazardType(HazardType.HEALTH_ABNORMAL)
+                .severity(hazardSeverityPolicy.resolve(HazardType.HEALTH_ABNORMAL))
+                .occurredAt(LocalDateTime.now())
+                .status(HazardStatus.UNHANDLED)
+                .source(HazardSource.IMU_HEALTH)
+                .sensorDataId(sensorDataId)
+                .heartRate(request.getHeartRate())
+                .spo2(request.getSpo2())
+                .hrv(request.getHrv())
+                .healthState(current)
+                .build());
+
+        log.info("건강 위험 이벤트 저장: id={}, deviceId={}, {} -> {}",
+                saved.getId(), helmet.getDeviceId(), previous, current);
+
+        if (worker != null) {
+            notificationService.notifyHealthAlert(saved, worker);
+        }
+
+        try {
+            hazardEventStreamService.publishHazard(saved);
+        } catch (Exception e) {
+            log.error("건강 이벤트 SSE push 실패 (저장은 완료): id={}, {}", saved.getId(), e.getMessage());
+        }
+        return saved.getId();
     }
 
     /**
@@ -344,6 +418,16 @@ public class SensorDataServiceImpl implements SensorDataService {
      * ACTION_REQUIRED 는 posture 가 STUMBLE(휘청거림)일 때 올라오는 값이고,
      * FALLING/FALLEN 은 자세 붕괴 또는 AI 낙상 판정, UNCONSCIOUS 는 펌웨어 의식불명 판정이다.
      */
+    // 추락 사고 안에서의 단계 순서. 숫자가 클수록 더 심각한 단계다.
+    private int hazardRank(HazardType type) {
+        return switch (type) {
+            case STUMBLE -> 1;
+            case FALL -> 2;
+            case UNCONSCIOUS -> 3;
+            default -> 0;
+        };
+    }
+
     private HazardType toHazardType(WorkerState fallState) {
         return switch (fallState) {
             case ACTION_REQUIRED -> HazardType.STUMBLE;

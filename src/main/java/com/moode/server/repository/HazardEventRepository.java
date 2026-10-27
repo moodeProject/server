@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,4 +33,12 @@ public interface HazardEventRepository
     // 최근 것 하나만 있으면 된다 — handle()로 RESOLVED 처리되면 더 이상 뜨지 않는다.
     Optional<HazardEvent> findFirstByWorker_IdAndCategoryAndStatusInOrderByOccurredAtDesc(
             Long workerId, HazardCategory category, List<HazardStatus> statuses);
+
+    // 건강 중복 생성 방지용. 같은 헬멧의 미처리·처리중 건강 사고가 있는지.
+    Optional<HazardEvent> findFirstByHelmet_IdAndCategoryAndStatusInOrderByOccurredAtDesc(
+            Long helmetId, HazardCategory category, List<HazardStatus> statuses);
+
+    // 추락 중복 병합용. 같은 헬멧의 미처리·처리중 사고 중 시간창 안에 발생한 가장 최근 것 하나.
+    Optional<HazardEvent> findFirstByHelmet_IdAndCategoryAndStatusInAndOccurredAtAfterOrderByOccurredAtDesc(
+            Long helmetId, HazardCategory category, List<HazardStatus> statuses, LocalDateTime after);
 }
