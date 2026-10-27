@@ -26,6 +26,7 @@ public class HazardEventIngestServiceImpl implements HazardEventIngestService {
     private final HelmetAssignmentResolver helmetAssignmentResolver;
     private final HazardNotificationService hazardNotificationService;
     private final HazardEventStreamService hazardEventStreamService;
+    private final HelmetVisionWarningRegistry helmetVisionWarningRegistry;
 
     @Override
     public HazardIngestResult receive(HazardEventIngestRequest request) {
@@ -58,6 +59,9 @@ public class HazardEventIngestServiceImpl implements HazardEventIngestService {
     private HazardIngestResult handleHazardConfirmed(HazardEventIngestRequest request) {
         HelmetAssignment assignment = helmetAssignmentResolver.resolve(request.getHelmetId());
         HazardEvent saved = hazardEventWriter.recordConfirmed(request, assignment);
+
+        // 헬멧 스피커 "조심하세요" 안내용. 다음 센서 전송 응답에 실려 나간다.
+        helmetVisionWarningRegistry.record(assignment.helmet().getDeviceId(), saved.getHazardType());
 
         notifyWorker(saved, assignment);
         // 저장 직후 대시보드로 push. 이걸 빠뜨리면 실시간 목록이 갱신되지 않는다.

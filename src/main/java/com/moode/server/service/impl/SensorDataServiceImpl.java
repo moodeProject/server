@@ -47,6 +47,7 @@ public class SensorDataServiceImpl implements SensorDataService {
     private final HazardEventStreamService hazardEventStreamService;
     private final HazardNotificationService hazardNotificationService;
     private final NotificationService notificationService;
+    private final HelmetVisionWarningRegistry helmetVisionWarningRegistry;
 
     private static final double ACC_LIMIT = 160.0;   // 가속도 허용 범위 (MPU6050 ±16g = 약 157 m/s^2)
     private static final double GYRO_LIMIT = 2000.0; // 각속도 허용 범위
@@ -120,6 +121,9 @@ public class SensorDataServiceImpl implements SensorDataService {
                 ? raiseHealthHazardEvent(request, helmet, previousHealthState, healthState, saved.getId())
                 : null;
 
+        Optional<HelmetVisionWarningRegistry.Warning> visionWarning =
+                helmetVisionWarningRegistry.activeFor(request.getDeviceId());
+
         return SensorDataResponse.builder()
                 .id(saved.getId())
                 .deviceId(saved.getDeviceId())
@@ -131,6 +135,8 @@ public class SensorDataServiceImpl implements SensorDataService {
                 .recordedAt(saved.getRecordedAt())
                 .fallHazardEventId(fallHazardEventId)
                 .healthHazardEventId(healthHazardEventId)
+                .hazardWarning(visionWarning.map(HelmetVisionWarningRegistry.Warning::hazardType).orElse(null))
+                .hazardWarningSeq(visionWarning.map(HelmetVisionWarningRegistry.Warning::seq).orElse(null))
                 .build();
     }
 
