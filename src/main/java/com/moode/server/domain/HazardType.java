@@ -49,6 +49,7 @@ public enum HazardType {
             "낙상 후 본인 확인 안내에도 움직임이 없어 헬멧이 의식불명으로 판정.",
             "즉시 현장으로 이동하고 119 등 응급 구조를 요청하세요."),
 
+    // 헬멧 MAX30102(심박·SpO2·HRV) 판정이 조치 필요 단계로 올라간 건강 이상. category=HEALTH, source=IMU_HEALTH
     HEALTH_ABNORMAL(HazardSeverity.DANGER, "건강 이상 감지", "건강 지표 이상",
             "헬멧 생체신호 센서에서 건강 위험이 감지되었습니다.",
             "작업을 중단시키고 작업자의 건강 상태를 즉시 확인하세요.");

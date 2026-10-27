@@ -50,6 +50,10 @@ public class HazardEventAction {
 
     private Integer notifiedCount;
 
+    // 관리자가 입력한 조치 내용. 선택 입력이라 null 일 수 있다.
+    @Column(length = 255)
+    private String memo;
+
     @PrePersist
     public void prePersist() {
         if (this.performedAt == null) {

@@ -120,6 +120,18 @@ public class HazardEvent {
     @Column(columnDefinition = "TEXT")
     private String aiReportText;
 
+    // 추락/건강 사고가 어느 센서 수신 기록에서 만들어졌는지(sensor_data.id). 영상 사고는 null.
+    private Long sensorDataId;
+
+    // 건강 사고 발생 당시의 생체 값과 위험 단계 스냅샷. 다른 사고 종류는 null.
+    private Double heartRate;
+    private Double spo2;
+    private Double hrv;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 16)
+    private WorkerState healthState;
+
     // 사건 발생 시각(occurredAt)과 달리 서버가 기록을 만든 시각이다.
     @Column(nullable = false)
     private LocalDateTime createdAt;
@@ -157,6 +169,14 @@ public class HazardEvent {
      * 관리자 조치 상태를 변경한다.
      * UNHANDLED 로 되돌리는 경우 조치자/조치시각도 함께 비운다.
      */
+    /**
+     * 추락 중복 병합 시 더 심각한 단계로 올린다. 위험 종류와 심각도를 함께 바꾼다.
+     */
+    public void escalate(HazardType newType, HazardSeverity newSeverity) {
+        this.hazardType = newType;
+        this.severity = newSeverity;
+    }
+
     public void handle(HazardStatus status, Long adminId) {
         if (status == null) {
             throw new IllegalArgumentException("변경할 상태는 필수입니다.");

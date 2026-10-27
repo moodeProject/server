@@ -165,12 +165,13 @@ public class NotificationServiceImpl implements NotificationService, HazardNotif
     // 작업자 위치를 갱신하므로 분리하면 서로 잠금을 기다릴 수 있다.
     @Override
     @Transactional
-    public void notifyHealthAlert(Worker worker) {
+    public void notifyHealthAlert(HazardEvent event, Worker worker) {
         String zoneName = worker.getCurrentZone() == null
                 ? "위치 미확인" : worker.getCurrentZone().getZoneName();
 
         // 작업자 본인
         notificationRepository.save(Notification.builder()
+                .event(event)
                 .recipientType(NotificationRecipientType.WORKER)
                 .recipientWorker(worker)
                 .message("건강 이상 징후가 감지되었습니다. 작업을 멈추고 상태를 확인하세요.")
@@ -179,12 +180,32 @@ public class NotificationServiceImpl implements NotificationService, HazardNotif
 
         // 관리자 공용 수신함 (manager_account 생기기 전이라 recipientAdminId 는 비워 둔다)
         notificationRepository.save(Notification.builder()
+                .event(event)
                 .recipientType(NotificationRecipientType.MANAGER)
                 .message(worker.getName() + " · " + zoneName + " · 건강 이상 징후(조치 필요)")
                 .triggeredBy(NotificationTriggeredBy.SYSTEM)
                 .build());
 
-        log.warn("[알림] 건강 이상 -> {}({}), 구역={}", worker.getName(), worker.getEmployeeNo(), zoneName);
+        log.warn("[알림] 건강 이상 -> {}({}), 구역={}, eventId={}",
+                worker.getName(), worker.getEmployeeNo(), zoneName, event.getId());
+    }
+
+    @Override
+    @Transactional
+    public void notifyFallAlert(HazardEvent event, Worker worker) {
+        String workerName = worker == null ? "작업자 미배정" : worker.getName();
+        String zoneName = (worker == null || worker.getCurrentZone() == null)
+                ? "위치 미확인" : worker.getCurrentZone().getZoneName();
+
+        notificationRepository.save(Notification.builder()
+                .event(event)
+                .recipientType(NotificationRecipientType.MANAGER)
+                .message(workerName + " · " + zoneName + " · " + event.resolveDescription())
+                .triggeredBy(NotificationTriggeredBy.SYSTEM)
+                .build());
+
+        log.warn("[알림] 추락 사고 관리자 알림 -> {}, 구역={}, eventId={}, hazardType={}",
+                workerName, zoneName, event.getId(), event.getHazardType());
     }
 
     // ===================== 위험 이벤트 (HazardNotificationService) =====================

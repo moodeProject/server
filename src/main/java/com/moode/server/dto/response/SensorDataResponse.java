@@ -27,4 +27,8 @@ public class SensorDataResponse {
     private String zoneId;
 
     private LocalDateTime recordedAt;
+
+    // 이번 수신으로 새로 만들었거나 병합된 사고 id. 해당 사고가 없으면 null.
+    private Long fallHazardEventId;
+    private Long healthHazardEventId;
 }
