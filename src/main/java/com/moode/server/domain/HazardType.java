@@ -50,9 +50,9 @@ public enum HazardType {
             "즉시 현장으로 이동하고 119 등 응급 구조를 요청하세요."),
 
     // 헬멧 MAX30102(심박·SpO2·HRV) 판정이 조치 필요 단계로 올라간 건강 이상. category=HEALTH, source=IMU_HEALTH
-    HEALTH_ABNORMAL(HazardSeverity.DANGER, "건강 이상", "건강 악화 및 응급 상황",
-            "헬멧 센서에서 심박·산소포화도 등 생체 신호의 건강 이상 감지.",
-            "작업을 즉시 중단하고 작업자 상태를 확인하세요. 필요 시 119 등 응급 구조를 요청하세요.");
+    HEALTH_ABNORMAL(HazardSeverity.DANGER, "건강 이상 감지", "건강 지표 이상",
+            "헬멧 생체신호 센서에서 건강 위험이 감지되었습니다.",
+            "작업을 중단시키고 작업자의 건강 상태를 즉시 확인하세요.");
 
     private final HazardSeverity defaultSeverity;
 

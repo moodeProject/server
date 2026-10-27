@@ -385,6 +385,8 @@ public class SensorDataServiceImpl implements SensorDataService {
                 .spo2(request.getSpo2())
                 .hrv(request.getHrv())
                 .healthState(current)
+                // 목록·상세 화면에서 바로 보이도록 발생 당시 생체 값을 설명 문구에도 남긴다.
+                .description(healthDescription(current, request))
                 .build());
 
         log.info("건강 위험 이벤트 저장: id={}, deviceId={}, {} -> {}",
@@ -400,6 +402,14 @@ public class SensorDataServiceImpl implements SensorDataService {
             log.error("건강 이벤트 SSE push 실패 (저장은 완료): id={}, {}", saved.getId(), e.getMessage());
         }
         return saved.getId();
+    }
+
+    /** 예: "건강 이상 감지 (ACTION_REQUIRED) · 심박 130.0bpm · SpO2 88.0% · HRV 20.0" */
+    private String healthDescription(WorkerState current, SensorDataRequest request) {
+        return "건강 이상 감지 (" + current.name() + ")"
+                + " · 심박 " + (request.getHeartRate() == null ? "미측정" : request.getHeartRate() + "bpm")
+                + " · SpO2 " + (request.getSpo2() == null ? "미측정" : request.getSpo2() + "%")
+                + " · HRV " + (request.getHrv() == null ? "미측정" : request.getHrv());
     }
 
     /**
