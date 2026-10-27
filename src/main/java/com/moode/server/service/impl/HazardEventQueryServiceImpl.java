@@ -7,6 +7,7 @@ import com.moode.server.domain.*;
 import com.moode.server.dto.response.*;
 import com.moode.server.exception.NotFoundException;
 import com.moode.server.repository.HazardClipRepository;
+import com.moode.server.repository.HazardEventActionRepository;
 import com.moode.server.repository.HazardEventRepository;
 import com.moode.server.repository.HazardEventSpecifications;
 import com.moode.server.service.ClipPlaybackUrl;
@@ -38,6 +39,7 @@ public class HazardEventQueryServiceImpl implements HazardEventQueryService {
 
     private final HazardEventRepository hazardEventRepository;
     private final HazardClipRepository hazardClipRepository;
+    private final HazardEventActionRepository hazardEventActionRepository;
     private final ClipUrlIssuer clipUrlIssuer;
     private final ObjectMapper objectMapper;
 
@@ -117,6 +119,12 @@ public class HazardEventQueryServiceImpl implements HazardEventQueryService {
                         .frameHeight(event.getFrameHeight())
                         .boxes(parseBoxes(event))
                         .build())
+                .vitals(HazardVitalsResponse.from(event))
+                .handledBy(event.getHandledBy())
+                .handledAt(event.getHandledAt() == null ? null : Times.toOffset(event.getHandledAt()))
+                .actions(hazardEventActionRepository.findByHazardEventIdOrderByPerformedAtAscIdAsc(eventId).stream()
+                        .map(HazardActionHistoryResponse::from)
+                        .toList())
                 .build();
     }
 

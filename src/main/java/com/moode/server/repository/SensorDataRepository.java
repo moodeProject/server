@@ -28,6 +28,19 @@ public interface SensorDataRepository extends JpaRepository<SensorData, Long> {
     """)
     List<SensorData> findAlerts(@Param("alertStates") List<WorkerState> alertStates);
 
+    // 추락 이력 전용. 건강만 이상이고 자세·추락은 정상(STABLE/NORMAL)인 기록이 추락 이력에 섞이지 않게 fallState 만 본다.
+    List<SensorData> findByFallStateIn(List<WorkerState> fallStates);
+
+    // 건강 이상 이력 전용
+    List<SensorData> findByHealthStateIn(List<WorkerState> healthStates);
+
+    // 센서 오류로 0 이 들어오는 경우가 있어, 헬멧별로 "0 보다 큰" 마지막 측정값을 따로 찾는다.
+    Optional<SensorData> findTop1ByDeviceIdAndHeartRateGreaterThanOrderByIdDesc(String deviceId, Double min);
+
+    Optional<SensorData> findTop1ByDeviceIdAndSpo2GreaterThanOrderByIdDesc(String deviceId, Double min);
+
+    Optional<SensorData> findTop1ByDeviceIdAndHrvGreaterThanOrderByIdDesc(String deviceId, Double min);
+
     /**
      * 헬멧(deviceId)별 가장 최근 수신 1건.
      *

@@ -1,8 +1,10 @@
 package com.moode.server.service.impl;
 
+import com.moode.server.domain.SensorAlertType;
 import com.moode.server.domain.SensorData;
 import com.moode.server.domain.WorkerState;
 import com.moode.server.dto.response.HeatRiskResponse;
+import com.moode.server.dto.response.LatestVitalsResponse;
 import com.moode.server.dto.response.WorkerStatusResponse;
 import com.moode.server.exception.NotFoundException;
 import com.moode.server.repository.SensorDataRepository;
@@ -40,11 +42,41 @@ public class WorkerServiceImpl implements WorkerService {
     }
 
     @Override
-    public List<WorkerStatusResponse> getAlerts() {
-        return sensorDataRepository.findAlerts(ALERT_STATES)
-                .stream()
+    public List<WorkerStatusResponse> getAlerts(SensorAlertType type) {
+        List<SensorData> rows;
+        if (type == SensorAlertType.FALL) {
+            rows = sensorDataRepository.findByFallStateIn(ALERT_STATES);
+        } else if (type == SensorAlertType.HEALTH) {
+            rows = sensorDataRepository.findByHealthStateIn(List.of(WorkerState.ACTION_REQUIRED));
+        } else {
+            rows = sensorDataRepository.findAlerts(ALERT_STATES);
+        }
+        return rows.stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Override
+    public LatestVitalsResponse getLatestVitals(String deviceId) {
+        SensorData last = sensorDataRepository.findTop1ByDeviceIdOrderByIdDesc(deviceId)
+                .orElseThrow(() -> new NotFoundException("존재하지 않는 기기입니다. " + deviceId));
+        SensorData hr = sensorDataRepository.findTop1ByDeviceIdAndHeartRateGreaterThanOrderByIdDesc(deviceId, 0.0)
+                .orElse(null);
+        SensorData spo2 = sensorDataRepository.findTop1ByDeviceIdAndSpo2GreaterThanOrderByIdDesc(deviceId, 0.0)
+                .orElse(null);
+        SensorData hrv = sensorDataRepository.findTop1ByDeviceIdAndHrvGreaterThanOrderByIdDesc(deviceId, 0.0)
+                .orElse(null);
+
+        return LatestVitalsResponse.builder()
+                .deviceId(deviceId)
+                .heartRate(hr == null ? null : hr.getHeartRate())
+                .heartRateRecordedAt(hr == null ? null : hr.getRecordedAt())
+                .spo2(spo2 == null ? null : spo2.getSpo2())
+                .spo2RecordedAt(spo2 == null ? null : spo2.getRecordedAt())
+                .hrv(hrv == null ? null : hrv.getHrv())
+                .hrvRecordedAt(hrv == null ? null : hrv.getRecordedAt())
+                .lastReceivedAt(last.getRecordedAt())
+                .build();
     }
 
     @Override

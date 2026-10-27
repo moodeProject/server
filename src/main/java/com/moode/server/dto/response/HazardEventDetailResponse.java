@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 /**
  * 상세 응답.
@@ -42,4 +43,14 @@ public class HazardEventDetailResponse {
     private HazardClipResponse clip;
 
     private HazardDetectionResponse detection;
+
+    // 건강 이상 사고의 발생 당시 생체 값. 생체 값을 저장하지 않는 영상·추락 사고면 null
+    private HazardVitalsResponse vitals;
+
+    // 마지막으로 상태를 바꾼 관리자와 시각. 미처리면 null
+    private Long handledBy;
+    private OffsetDateTime handledAt;
+
+    // 조치 이력(시간순). 조치 전이면 빈 목록
+    private List<HazardActionHistoryResponse> actions;
 }
