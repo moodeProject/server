@@ -1,15 +1,19 @@
 package com.moode.server.controller;
 
 import com.moode.server.common.ApiResponse;
+import com.moode.server.domain.SensorAlertType;
 import com.moode.server.dto.response.HeatRiskResponse;
+import com.moode.server.dto.response.LatestVitalsResponse;
 import com.moode.server.dto.response.WorkerStatusResponse;
 import com.moode.server.service.WorkerService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -38,10 +42,21 @@ public class WorkerController {
         return ApiResponse.success(workerService.getWorkerStatus(deviceId));
     }
 
-    @Operation(summary = "추락 감지 이력 조회")
+    @Operation(summary = "추락·건강 이상 센서 이력 조회",
+            description = "type=FALL 이면 추락 단계(휘청거림 이상)인 기록만, type=HEALTH 면 건강 조치 필요 기록만 준다. "
+                    + "비우면 둘 중 하나라도 해당하는 기록 전체(예전 동작). 추락 이력 화면은 type=FALL 을 쓴다.")
     @GetMapping("/alerts")
-    public ApiResponse<List<WorkerStatusResponse>> getAlerts() {
-        return ApiResponse.success(workerService.getAlerts());
+    public ApiResponse<List<WorkerStatusResponse>> getAlerts(
+            @Parameter(description = "FALL 또는 HEALTH. 생략하면 전체")
+            @RequestParam(required = false) SensorAlertType type) {
+        return ApiResponse.success(workerService.getAlerts(type));
+    }
+
+    @Operation(summary = "헬멧별 최근 유효 생체 측정값",
+            description = "센서 오류로 0 이 들어온 수신은 건너뛰고, 심박·SpO₂·HRV 각각 0 보다 큰 마지막 값을 준다.")
+    @GetMapping("/{deviceId}/vitals/latest")
+    public ApiResponse<LatestVitalsResponse> getLatestVitals(@PathVariable String deviceId) {
+        return ApiResponse.success(workerService.getLatestVitals(deviceId));
     }
 
     @Operation(summary = "전체 작업자 온열질환/피로도 현황 조회")

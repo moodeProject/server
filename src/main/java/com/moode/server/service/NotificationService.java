@@ -40,6 +40,7 @@ public interface NotificationService {
      * 건강 이상(조치 필요 단계 진입) 알림. 작업자 본인과 관리자 공용 수신함에 1건씩 저장하고,
      * 두 알림 모두 건강 사고(hazard_event)에 연결한다.
      * 센서 수신(SensorDataServiceImpl)에서 사고가 새로 만들어진 순간에만 호출한다.
+     * 작업자 미배정 헬멧이면(worker == null) 관리자 알림만 남긴다.
      */
     void notifyHealthAlert(HazardEvent event, Worker worker);
 

@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.stream.Collectors;
 
@@ -32,6 +33,15 @@ public class GlobalExceptionHandler {
     public ApiResponse<Void> handleNotReadable(HttpMessageNotReadableException e) {
         log.error("본문을 파싱할 수 없음: {}", e.getMessage());
         return ApiResponse.fail("요청 본문을 파싱할 수 없습니다.");
+    }
+
+    // 쿼리 파라미터를 enum·숫자로 바꾸지 못한 경우(예: ?type=fall, ?recipientType=ADMIN).
+    // 이 핸들러가 없으면 맨 아래 Exception 핸들러로 떨어져 사용자 입력 오류가 500 으로 보인다.
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        log.error("파라미터 형식 오류: {}={}", e.getName(), e.getValue());
+        return ApiResponse.fail(e.getName() + " 값이 올바르지 않습니다: " + e.getValue());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
