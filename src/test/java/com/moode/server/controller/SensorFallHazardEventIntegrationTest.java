@@ -131,21 +131,21 @@ class SensorFallHazardEventIntegrationTest {
     }
 
     @Test
-    @DisplayName("휘청거림 뒤에 실제로 쓰러지면 추락 이벤트가 따로 만들어진다")
-    void escalationCreatesSecondEvent() throws Exception {
+    @DisplayName("휘청거림 뒤에 실제로 쓰러지면 같은 사고가 추락 단계로 올라간다")
+    void escalationUpgradesSameEvent() throws Exception {
         sendSensorData("STUMBLE");
         sendSensorData("STUMBLE");
         sendSensorData("COLLAPSE");
 
-        assertThat(hazardEventRepository.count()).isEqualTo(2);
+        // 60초 안의 같은 헬멧 사고라 하나로 묶이고, 위험 종류만 추락으로 올라간다.
+        assertThat(hazardEventRepository.count()).isEqualTo(1);
 
-        // 목록은 최신순이라 추락이 먼저 나온다. 앞선 휘청거림에 묻히지 않는 것이 핵심이다.
         mockMvc.perform(get(HAZARD_PATH))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].hazardType").value("fall"))
                 .andExpect(jsonPath("$.content[0].severity").value("DANGER"))
-                .andExpect(jsonPath("$.content[1].hazardType").value("stumble"))
-                .andExpect(jsonPath("$.summary.fall").value(2));
+                .andExpect(jsonPath("$.summary.fall").value(1));
     }
 
     /** 펌웨어가 낙상 감지 직후, 그리고 의식불명 확정 시 보내는 payload. */
@@ -168,22 +168,22 @@ class SensorFallHazardEventIntegrationTest {
     }
 
     @Test
-    @DisplayName("낙상 뒤 의식불명이 확정되면 의식불명 이벤트가 따로 만들어진다")
-    void unconsciousAfterFallCreatesSeparateEvent() throws Exception {
+    @DisplayName("낙상 뒤 의식불명이 확정되면 같은 사고가 의식불명 단계로 올라간다")
+    void unconsciousAfterFallUpgradesSameEvent() throws Exception {
         sendFall(false);  // 낙상 감지 즉시 전송
         sendFall(false);  // 같은 낙상 상태가 이어지는 정기 전송
         sendFall(true);   // 무움직임 확인 후 의식불명 확정
 
-        assertThat(hazardEventRepository.count()).isEqualTo(2);
+        // 같은 사고로 묶이고, 의식불명은 추락보다 한 단계 위라 위험 종류가 올라간다.
+        assertThat(hazardEventRepository.count()).isEqualTo(1);
 
-        // 이미 추락(FALLEN)으로 올라가 있어도 의식불명은 한 단계 위라 묻히지 않는다.
         mockMvc.perform(get(HAZARD_PATH))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].hazardType").value("unconscious"))
                 .andExpect(jsonPath("$.content[0].severity").value("DANGER"))
                 .andExpect(jsonPath("$.content[0].zone.code").value("A-3F"))
-                .andExpect(jsonPath("$.content[1].hazardType").value("fall"))
-                .andExpect(jsonPath("$.summary.fall").value(2));
+                .andExpect(jsonPath("$.summary.fall").value(1));
     }
 
     @Test
