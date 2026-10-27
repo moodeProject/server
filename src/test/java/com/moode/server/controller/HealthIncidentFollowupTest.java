@@ -228,5 +228,10 @@ class HealthIncidentFollowupTest {
         mockMvc.perform(get("/api/workers/alerts")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(jsonPath("$.data.length()").value(2));
+
+        // 잘못된 type 은 서버 오류(500)가 아니라 요청 오류(400)
+        mockMvc.perform(get("/api/workers/alerts").param("type", "fall-history")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isBadRequest());
     }
 }
