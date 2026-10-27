@@ -110,6 +110,7 @@ public class SensorDataServiceImpl implements SensorDataService {
         // 건강 이상 알림 — 조치 필요 단계로 올라간 순간에만 작업자·관리자에게 저장한다.
         if (healthAlert) {
             raiseHealthNotification(helmet, previousHealthState, healthState);
+            raiseHealthHazardEvent(helmet, previousHealthState, healthState, saved);
         }
 
         // 8. 추락 위험 이벤트 기록 — 관리자 대시보드(/api/v1/hazard-events)로 올린다.
@@ -326,6 +327,46 @@ public class SensorDataServiceImpl implements SensorDataService {
             return; // 같은 상태가 이어지는 중 — 이미 보낸 알림이 대표한다
         }
         notificationService.notifyHealthAlert(helmet.getWorker());
+    }
+
+    /**
+     * Record a health escalation as an actionable hazard event. The original
+     * sensor sample is retained in sensor_data; a readable snapshot is kept
+     * in the incident description without any schema migration.
+     * Repeated packets at the same level do not create duplicate incidents.
+     */
+    private void raiseHealthHazardEvent(Helmet helmet, WorkerState previous,
+                                        WorkerState current, SensorData sample) {
+        if (helmet == null || helmet.getWorker() == null || !isEscalation(previous, current)) return;
+
+        Worker worker = helmet.getWorker();
+        HazardType type = HazardType.HEALTH_ABNORMAL;
+        String description = "건강 이상 감지 (" + current.name() + ")"
+                + " · 심박 " + (sample.getHeartRate() == null ? "미측정" : sample.getHeartRate() + "bpm")
+                + " · SpO2 " + (sample.getSpo2() == null ? "미측정" : sample.getSpo2() + "%")
+                + " · HRV " + (sample.getHrv() == null ? "미측정" : sample.getHrv());
+        HazardEvent event = hazardEventRepository.save(HazardEvent.builder()
+                .eventUid(UUID.randomUUID().toString().replace("-", ""))
+                .helmet(helmet)
+                .worker(worker)
+                .zone(worker.getCurrentZone())
+                .category(HazardCategory.HEALTH)
+                .hazardType(type)
+                .severity(current == WorkerState.ACTION_REQUIRED
+                        ? hazardSeverityPolicy.resolve(type)
+                        : com.moode.server.domain.HazardSeverity.WARNING)
+                .description(description)
+                .occurredAt(LocalDateTime.now())
+                .status(HazardStatus.UNHANDLED)
+                .source(HazardSource.IMU_HEALTH)
+                .build());
+        log.info("건강 위험 이벤트 저장: eventId={}, deviceId={}, healthState={}",
+                event.getId(), helmet.getDeviceId(), current);
+        try {
+            hazardEventStreamService.publishHazard(event);
+        } catch (Exception e) {
+            log.error("건강 이벤트 SSE push 실패 (저장은 완료): eventId={}, {}", event.getId(), e.getMessage());
+        }
     }
 
     /**
