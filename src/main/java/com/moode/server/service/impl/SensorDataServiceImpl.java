@@ -47,6 +47,7 @@ public class SensorDataServiceImpl implements SensorDataService {
     private final HazardEventStreamService hazardEventStreamService;
     private final HazardNotificationService hazardNotificationService;
     private final NotificationService notificationService;
+    private final RecentFallCache recentFallCache;
 
     private static final double ACC_LIMIT = 160.0;   // 가속도 허용 범위 (MPU6050 ±16g = 약 157 m/s^2)
     private static final double GYRO_LIMIT = 2000.0; // 각속도 허용 범위
@@ -98,6 +99,9 @@ public class SensorDataServiceImpl implements SensorDataService {
                         .zoneId(request.getZoneId())
                         .build()
         );
+
+        // 실시간 조회에서 추락 값이 바로 덮이지 않도록 최근 추락을 보관 (RecentFallCache 참고)
+        recentFallCache.record(request.getDeviceId(), fallResult.state(), fallResult.confidence());
 
         // 6. 도메인별로 각자 알림 여부 판단 + 각자 알림 발생 (섞지 않음)
         boolean fallAlert = isAlertState(fallResult.state());
