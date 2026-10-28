@@ -48,6 +48,7 @@ public class SensorDataServiceImpl implements SensorDataService {
     private final HazardNotificationService hazardNotificationService;
     private final NotificationService notificationService;
     private final RecentFallCache recentFallCache;
+    private final HelmetVisionWarningRegistry helmetVisionWarningRegistry;
 
     private static final double ACC_LIMIT = 160.0;   // 가속도 허용 범위 (MPU6050 ±16g = 약 157 m/s^2)
     private static final double GYRO_LIMIT = 2000.0; // 각속도 허용 범위
@@ -124,6 +125,9 @@ public class SensorDataServiceImpl implements SensorDataService {
                 ? raiseHealthHazardEvent(request, helmet, previousHealthState, healthState, saved.getId())
                 : null;
 
+        Optional<HelmetVisionWarningRegistry.Warning> visionWarning =
+                helmetVisionWarningRegistry.activeFor(request.getDeviceId());
+
         return SensorDataResponse.builder()
                 .id(saved.getId())
                 .deviceId(saved.getDeviceId())
@@ -135,6 +139,8 @@ public class SensorDataServiceImpl implements SensorDataService {
                 .recordedAt(saved.getRecordedAt())
                 .fallHazardEventId(fallHazardEventId)
                 .healthHazardEventId(healthHazardEventId)
+                .hazardWarning(visionWarning.map(HelmetVisionWarningRegistry.Warning::hazardType).orElse(null))
+                .hazardWarningSeq(visionWarning.map(HelmetVisionWarningRegistry.Warning::seq).orElse(null))
                 .build();
     }
 
@@ -351,7 +357,7 @@ public class SensorDataServiceImpl implements SensorDataService {
      * 건강 이상을 hazard_event(카테고리 HEALTH)로 올리고 작업자·관리자에게 알린다.
      * 낙상과 같은 isEscalation 으로 "상태가 올라간 순간"에만 만들고, 같은 헬멧에 미처리·처리중 건강 사고가
      * 이미 있으면 새로 만들지 않는다. 발생 당시 심박·SpO₂·HRV·위험 단계를 사고에 함께 저장한다.
-     * 헬멧이 등록되지 않았거나 작업자가 배정되지 않았으면 알릴 대상이 없어 알림은 건너뛴다.
+     * 헬멧이 등록되지 않았으면 사고를 만들 수 없어 건너뛰고, 작업자가 배정되지 않았으면 관리자에게만 알린다.
      */
     private Long raiseHealthHazardEvent(SensorDataRequest request, Helmet helmet,
                                         WorkerState previous, WorkerState current, Long sensorDataId) {
@@ -396,9 +402,8 @@ public class SensorDataServiceImpl implements SensorDataService {
         log.info("건강 위험 이벤트 저장: id={}, deviceId={}, {} -> {}",
                 saved.getId(), helmet.getDeviceId(), previous, current);
 
-        if (worker != null) {
-            notificationService.notifyHealthAlert(saved, worker);
-        }
+        // 작업자 미배정 헬멧이어도 관리자에게는 알린다 (추락 알림과 같은 기준)
+        notificationService.notifyHealthAlert(saved, worker);
 
         try {
             hazardEventStreamService.publishHazard(saved);
